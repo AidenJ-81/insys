@@ -51,16 +51,40 @@ Dockerfile          컨테이너 이미지 정의
 
 | 변수 | 설명 | 기본값 |
 |---|---|---|
-| `AI_PROVIDER` | `anthropic` \| `openai` \| `custom` | `anthropic` |
+| `AI_PROVIDER` | `anthropic` \| `openai` \| `worksai` \| `custom` | `anthropic` |
 | `AI_API_KEY` | 사용할 API 키 | (필수) |
-| `AI_MODEL` | 모델 이름 | `claude-sonnet-4-6` |
-| `AI_BASE_URL` | 커스텀 엔드포인트 (예: 웍스AI, 사내 API) | 제공자별 기본 URL |
+| `AI_MODEL` | 모델 이름 (anthropic/openai 전용) | `claude-sonnet-4-6` |
+| `AI_BASE_URL` | 커스텀 엔드포인트 | 제공자별 기본 URL |
+| `AI_AGENT_ID` | **웍스AI 전용, 필수** — 사용할 에이전트 ID | (없음) |
 
-**웍스AI처럼 IP 허용 목록이 필요한 사내 API를 쓰는 경우**: `AI_PROVIDER=custom`으로 설정하고
-`AI_BASE_URL`에 발급받은 엔드포인트를, `AI_API_KEY`에 발급받은 키를 넣으세요. 이 서버가 배포된
-Coolify 인스턴스의 고정 아웃바운드 IP를 웍스AI 관리자 화면의 "허용된 IP 주소"에 등록해야 호출이
-성공합니다. 응답 형식이 Anthropic과 다르면 `main.py`의 `ai_complete` 함수 중 `custom` 분기를
-실제 API 문서에 맞게 수정하세요 (요청/응답 필드명이 다를 수 있습니다).
+### 웍스AI 연동 (`AI_PROVIDER=worksai`)
+
+이 서버는 웍스AI **"에이전트 대화 API v2"**의 단발 JSON 경로(`POST /v2/chat/json`)를 그대로
+구현해뒀습니다. 설정할 값:
+
+| 변수 | 값 | 비고 |
+|---|---|---|
+| `AI_PROVIDER` | `worksai` | |
+| `AI_API_KEY` | 웍스AI에서 발급받은 키 (`wrks_...`) | API 키 관리 화면에서 발급 |
+| `AI_BASE_URL` | `https://gateway-api.wrks.ai` (기본값이라 생략 가능) | |
+| `AI_AGENT_ID` | 사용할 에이전트의 `id` | 아래 방법으로 확인 |
+
+**에이전트 ID 확인 방법**: 아래처럼 호출하면 사용 가능한 에이전트 목록이 나옵니다.
+```bash
+curl -X GET "https://gateway-api.wrks.ai/v2/agents" -H "API-KEY: {발급받은 키}"
+# → {"result":"ok","data":[{"id":12,"name":"사내 규정 비서"}]}
+```
+여기서 나온 `id` 값을 `AI_AGENT_ID`에 넣으세요. 이 앱의 용도(업무 기록 분류, 코멘트 작성 등)에
+맞는 범용 대화 에이전트를 하나 새로 만들어서 그 ID를 쓰시는 걸 권장합니다 (특정 업무 전용
+에이전트를 쓰면 시스템 프롬프트가 충돌할 수 있어요).
+
+**웍스AI 특유의 동작**:
+- 호출할 때마다 로그인한 직원의 이메일을 `X-Actor-User-Email` 헤더로 자동으로 실어 보냅니다 —
+  웍스AI 쪽 사용량/감사 로그가 실제 호출한 직원 기준으로 남습니다.
+- 응답에서 `data.message` 필드를 텍스트로 사용합니다. 만약 웍스AI 쪽 응답 스키마가 향후
+  바뀌어서 이 필드가 비어있으면, 에러 메시지에 원본 응답을 그대로 담아 보여주도록 만들어뒀으니
+  그 메시지를 보고 `main.py`의 `ai_complete` 함수 중 `worksai` 분기를 수정하면 됩니다.
+- IP 허용 목록에 이 서버(Coolify)의 아웃바운드 IP를 등록해야 호출이 성공합니다.
 
 **참고**: 지금 이 서버는 프롬프트를 그대로 전달만 하고, 이름 익명화는 여전히 브라우저(JS)
 쪽에서 처리합니다. 더 강하게 강제하려면(사용자가 브라우저에서 우회 못 하도록) 익명화 로직을

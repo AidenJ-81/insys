@@ -23,10 +23,11 @@ ALLOWED_EMAIL_DOMAIN = os.environ.get("ALLOWED_EMAIL_DOMAIN", "xicna.com").strip
 SESSION_COOKIE_NAME = "insys_session"
 
 # AI 제공자 설정 - Anthropic이 기본값이지만 다른 제공자로 교체 가능
-AI_PROVIDER = os.environ.get("AI_PROVIDER", "anthropic")  # anthropic | openai | custom
+AI_PROVIDER = os.environ.get("AI_PROVIDER", "anthropic")  # anthropic | openai | worksai | custom
 AI_API_KEY = os.environ.get("AI_API_KEY", "")
 AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
 AI_BASE_URL = os.environ.get("AI_BASE_URL", "")  # custom 제공자(예: 웍스AI) 사용 시 엔드포인트 지정
+AI_AGENT_ID = os.environ.get("AI_AGENT_ID", "")  # 웍스AI 전용 - 사용할 에이전트 ID
 
 app = FastAPI(title="INSYS")
 
@@ -337,7 +338,7 @@ def _post_json(url: str, body: dict, headers: dict) -> dict:
 
 @app.post("/api/ai/complete")
 def ai_complete(body: AIBody, request: Request):
-    require_user(request)
+    user = require_user(request)
     if not AI_API_KEY:
         raise HTTPException(500, "서버에 AI_API_KEY 환경변수가 설정되어 있지 않습니다.")
 
@@ -369,10 +370,37 @@ def ai_complete(body: AIBody, request: Request):
         text = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
         return {"text": text}
 
-    # custom: 사내 API(예: 웍스AI)처럼 별도 엔드포인트/형식을 쓰는 경우.
-    # 기본적으로 Anthropic 호환 형식(messages)으로 보내되, 응답은 text 또는
-    # content[].text 두 가지 형태 모두 시도해서 파싱한다. 실제 API 문서에 맞춰
-    # 이 블록만 수정하면 된다.
+    if AI_PROVIDER == "worksai":
+        # 에이전트 대화 API v2 (단발 JSON 경로) - https://gateway-api.wrks.ai/v2/chat/json
+        if not AI_AGENT_ID:
+            raise HTTPException(
+                500,
+                "AI_AGENT_ID 환경변수가 필요합니다. 웍스AI에서 GET /v2/agents 로 조회한 "
+                "에이전트의 id 값을 넣어주세요.",
+            )
+        base = (AI_BASE_URL or "https://gateway-api.wrks.ai").rstrip("/")
+        url = f"{base}/v2/chat/json"
+        req_body = {"message": body.prompt, "agentId": AI_AGENT_ID}
+        headers = {
+            "Content-Type": "application/json",
+            "API-KEY": AI_API_KEY,
+            # 실제 로그인한 직원 신원으로 호출 - 웍스AI 쪽 사용량/감사 로그가 이 직원 기준으로 남는다.
+            "X-Actor-User-Email": user["email"],
+        }
+        data = _post_json(url, req_body, headers)
+        if data.get("result") == "error":
+            code = data.get("code", "UNKNOWN")
+            raise HTTPException(502, f"웍스AI 오류({code}): {json.dumps(data, ensure_ascii=False)[:300]}")
+        text = (data.get("data") or {}).get("message", "")
+        if not text:
+            # 응답 스키마가 예상과 다를 때 원인을 바로 알 수 있도록 원본을 보여준다.
+            raise HTTPException(
+                502,
+                f"응답에서 텍스트를 찾지 못했습니다. 원본 응답: {json.dumps(data, ensure_ascii=False)[:500]}",
+            )
+        return {"text": text}
+
+    # custom: 위 세 가지 외에 다른 사내 API를 쓰는 경우 이 블록만 수정해서 쓰면 된다.
     if not AI_BASE_URL:
         raise HTTPException(500, "AI_PROVIDER=custom일 때는 AI_BASE_URL 환경변수가 필요합니다.")
     req_body = {
