@@ -508,7 +508,7 @@
     formContent: '', formStatus: '진행중', formEvalItem: '',
     viewPersonSel: '', viewGoalSel: '', personDeptFilter: '',
     recordSubTab: 'chat', viewSubTab: 'annual', manageSubTab: 'mbo', adminSubTab: 'permissions', quarterSel: '',
-    myRole: 'primary', adminPrimaryLabel: '본인', adminSecondaryNames: [], confirmTransferPrimary: null,
+    myRole: 'primary', confirmTransferPrimary: null,
     gsConfirmDelete: null,
     gsGoalSel: '', gsDesc: '', gsScopeNotes: '', gsPeriodStart: '', gsPeriodEnd: '', gsWeight: '', gsModalOpen: false,
     aiLoading: false, aiStrengths: '', aiImprovements: '', aiError: '', aiForPerson: '', aiItems: [],
@@ -527,87 +527,6 @@
     loaded: false
   };
 
-  const DEFAULT_EVAL_ITEMS = [
-    { name: '최적의 의사결정', desc:
-`[직책자] 합의가 어렵거나, 저항 및 부정적 반응이 예상되는 사안에 대해서도 분명하게 의사결정하는 리더입니까?
-[비직책자] 축적된 경험과 노하우를 기반으로 사안의 중요도와 우선순위를 고려하여 시의적절하게 대처하는 동료입니까?
-1~2점: 해당 업무 혹은 현안 이슈에 대한 이해와 전문지식/경험이 부족함
-3~5점: 본인 업무 및 타 분야의 업무지식까지 두루 갖추었으며, 복잡한 문제들의 근본원인을 파악하고 대안을 제시함
-6~7점: 새롭고 창의적인 방법론을 만들 수 있을 정도로 유능하며, 잠재적인 문제도 예측하여 새로운 대안을 수립함` },
-    { name: '신속한 의사결정 및 정보/의견 제공', desc:
-`[직책자] 다양한 대안들을 신속하게 검토하여 의사결정하는 리더입니까?
-[비직책자] 리더가 최적의 의사결정을 할 수 있도록 다양한 정보와 구성원들의 의견을 수집/제공할 수 있는 동료입니까?
-1~2점: 책임전가/회피를 위해 의도적으로 의사결정을 지연함
-3~5점: 수집된 정보/이슈 등을 정확히 분석하고, 의사결정시 적절히 활용함
-6~7점: 깊은 Insight를 바탕으로, 여러 대안들을 정확히 판단하고 의사결정의 파급효과까지 고려하여 적시에 의사결정함` },
-    { name: '업무의 조정/조율', desc:
-`[직책자] 팀 내 업무 공백 및 중복을 최소화하기 위해 팀원 간의 업무를 조율하거나 조정하는 리더입니까?
-[비직책자] 팀 내 업무 공백 및 중복 발생 여부를 파악하고, 업무를 조율 및 조정하는 데 능동적으로 참여하는 동료입니까?
-1~2점: 개인의 이익을 최우선시하며 본인의 업무효율만을 중요시함
-3~5점: 업무관련 절차를 준수하는 수준에서 팀 내 업무를 조정/조율함
-6~7점: 회사의 전략과 목표 달성을 위해 절차를 준수하며 성과창출에 기여할 수 있도록 팀 내 업무를 조정/조율함` },
-    { name: '구체적 정보제공 및 이슈사항 공유', desc:
-`[직책자] 구체적인 설명(배경, 산출물, 마감기한 등)과 함께 명확하게 업무를 지시하는 리더입니까?
-[비직책자] 업무 수행 과정에서 본인의 경험, 노하우를 기반으로 파악한 이슈사항을 구성원들에게 자발적으로 공유하는 동료입니까?
-1~2점: 업무에 대한 공유 및 지시가 매우 미흡함
-3~5점: 업무 수행과정에 있어 필요한 범위 내 공유함
-6~7점: 이슈사항을 구체적이고 명확하게 전달하며 본인의 경험을 자발적으로 공유함` },
-    { name: '업무추진사항 모니터링 및 장애요인 파악', desc:
-`[직책자] 구성원들의 업무 추진 현황을 지속적으로 모니터링하고, 개선이 필요한 부분을 파악하여 적절한 지시를 내리는 리더입니까?
-[비직책자] 구성원들의 성과 창출을 저해하는 요인을 파악하고, 해소할 수 있도록 의견을 제공할 수 있는 동료입니까?
-1~2점: '일단 하고보자'라는 식으로 무조건적인 실행만 강조하며, 업무 진척도를 주기적으로 관리하지 않음
-3~5점: 도전적 목표를 설정하고, 달성방법과 추진일정 등을 구체적으로 수립함
-6~7점: 실행 중 발생가능한 예상이슈를 사전에 발굴하고 대안까지 마련하며, 이슈 발생 시 즉각 개선 방안을 마련하여 강력히 실천함` },
-    { name: '환경변화에 따른 상황적응력', desc:
-`[직책자] 내/외부 환경 변화를 고려하며 업무의 우선순위를 조율 및 조정하는 리더입니까?
-[비직책자] 내/외부 환경 변화에 업무 수행 방식 및 수행 시기를 유연하게 변화시킬 수 있는 동료입니까?
-1~2점: 본인 업무 외 경영환경 및 시장 변화에 무관심하고, 단기적 목표 달성에 얽매이며 기존의 방식을 고수함
-3~5점: 단기적 이슈에 대응하는 수준이며, 본인 업무에 국한하여 개선을 시도함
-6~7점: 환경 변화를 예측하여 새로운 기회를 발굴하고, 이를 선점하기 위한 전략, 혁신방안을 개발/적용함` },
-    { name: '행동변화 독려 및 비전 정렬', desc:
-`[직책자] 내/외부 환경 변화에 대응하기 위해 본인은 물론 구성원들의 행동변화를 독려하는 리더입니까?
-[비직책자] 조직의 비전과 개인의 비전 간 연계를 위해 스스로 어떠한 노력을 해야하는지 계획을 구체화하고, 계획대로 실행하기 위해 노력하는 동료입니까?
-1~2점: 조직의 비전, 환경의 변화에 무관심하며 개인의 이익만을 최우선시하며 업무를 수행함
-3~5점: 본인의 행동변화를 개선하는 수준임
-6~7점: 환경변화에 대응하기 위해 스스로 노력하고 본인 뿐만 아니라 구성원들의 행동변화를 독려함` },
-    { name: '비전 및 목적 제시', desc:
-`[직책자] 조직의 비전과 목적에 대해 충분한 설명을 제시하고, 비전 달성에 대한 열정을 가질 수 있도록 독려하는 리더입니까?
-[비직책자] 조직의 비전 및 목적에 대해 충분히 이해하고 있으며, 비전 및 목적 달성에 열정을 가지고 있는 동료입니까?
-1~2점: 비전/미션 및 중장기 목표보다는 단기목표 달성에 얽매임
-3~5점: 조직의 비전과 미션을 명확히 제시하는 수준임
-6~7점: 조직의 비전과 구성원 개인간의 비전을 Alignment 하여, 구성원들의 자발적 참여를 유도함` },
-    { name: '적극적 소통 및 심리적안전감 조성', desc:
-`[직책자] 구성원들이 Speak Up 할 수 있도록 분위기를 조성하며 구성원들의 의견을 적극적으로 경청/수렴하는 리더입니까?
-[비직책자] 문제 해결을 위해 상대방의 의견을 경청하고, 새로운 아이디어와 접근 방식을 적극적으로 제안하는 동료입니까?
-1~2점: 이기주의 성향이 있으며 업무정보와 자원을 독점함
-3~5점: 평균적인 수준에서 헌신하며 조직 내에서 협력을 창출하기 위해 노력함
-6~7점: 회사 전체의 성과를 위해 개인과 부서의 이익도 기꺼이 희생하며, 구성원(동료)에게도 협력을 적극 독려함` },
-    { name: '코칭 및 피드백', desc:
-`[직책자] 적극적으로 자상하게 코칭하고 업무결과에 대하여 즉시 피드백 하며, 부하(후배)직원의 개인적 성장을 물심양면 지원하는 리더입니까?
-[비직책자] 동료의 성장과 업무적 성공을 위해 관심을 가지고 적극적으로 의견을 전달하는 동료입니까?
-1~2점: 구성원의 성장에 무관심하며 업무수행만을 강조함
-3~5점: 업무수행과 관련된 코칭/피드백은 있으나 구성원 개인의 장기적 성장에 대해서는 다소 무관심함
-6~7점: 평소 세밀하게 코칭하고 격려할 뿐만 아니라 개인의 성장에도 적극 관심을 가지고 다양하게 지원함` }
-  ];
-
-  const DEFAULT_COMPANY_PROFILE =
-`[비전] 국내 Top Tier 산업플랜트 Provider
-
-[핵심가치 및 조직문화 4대 지향점]
-- 혁신: 실패에서 배우고, 재발을 막는 조직
-- 전문성: 전문성을 최고의 가치로 여기는 조직
-- 사람중심: 오픈 커뮤니케이션이 당연한 조직
-- 동반성장: 부서·현장을 넘어 함께 움직이는 조직 (One-Team Spirit에 기반한 조직 플레이)
-
-[핵심가치 선순환 체계]
-역량에 대한 자신감이 생기면 틀릴 것을 두려워하지 않고 솔직하게 소통할 수 있다. 심리적 안전감이 보장된 조직에서는 같은 실패를 반복하지 않고 새로운 도전이 가능해진다. 이렇게 실패와 도전을 통해 축적된 경험을 함께 나누면 우리만의 자산이 되고, 신뢰를 기반으로 함께 성장함으로써 더욱 높은 수준의 전문성을 갖추게 된다.
-
-[2026년 슬로건]
-2026년 실행의 해 - 우리가 함께 만드는 조직문화. 자이C&A의 실행력은 우리가 함께 만드는 조직문화에서 시작된다.
-
-[마무리 메시지]
-우리는 배움을 두려워하지 않는 전문가이며, 언제나 솔직하게 소통하는 하나의 팀이다.`;
-
   const STORAGE_KEY = 'work-journal-data';
 
   async function loadData() {
@@ -617,8 +536,6 @@
         const parsed = await res.json();
         state.people = parsed.people || [];
         state.goals = parsed.goals || [];
-        state.evalItems = parsed.evalItems || [];
-        state.evalItemDetails = parsed.evalItemDetails || {};
         state.departments = parsed.departments || [];
         state.personDept = parsed.personDept || {};
         state.entries = parsed.entries || [];
@@ -632,21 +549,9 @@
         });
         state.goalDetails = parsed.goalDetails || {};
         state.chatPersona = parsed.chatPersona || 'default';
-        state.companyProfile = parsed.companyProfile || '';
-        state.myRole = parsed.myRole || 'primary';
-        state.adminPrimaryLabel = parsed.adminPrimaryLabel || '본인';
-        state.adminSecondaryNames = parsed.adminSecondaryNames || [];
       }
     } catch (e) {}
-    if (state.evalItems.length === 0 && Object.keys(state.evalItemDetails).length === 0) {
-      state.evalItems = DEFAULT_EVAL_ITEMS.map(it => it.name);
-      DEFAULT_EVAL_ITEMS.forEach(it => { state.evalItemDetails[it.name] = it.desc; });
-      saveData();
-    }
-    if (!state.companyProfile) {
-      state.companyProfile = DEFAULT_COMPANY_PROFILE;
-      saveData();
-    }
+    await loadCompanySettings();
     state.loaded = true;
     render();
   }
@@ -658,16 +563,41 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           data: {
-            people: state.people, goals: state.goals, evalItems: state.evalItems, evalItemDetails: state.evalItemDetails,
+            people: state.people, goals: state.goals,
             departments: state.departments, personDept: state.personDept,
-            entries: state.entries, goalDetails: state.goalDetails, chatPersona: state.chatPersona,
-            companyProfile: state.companyProfile,
-            myRole: state.myRole, adminPrimaryLabel: state.adminPrimaryLabel, adminSecondaryNames: state.adminSecondaryNames
+            entries: state.entries, goalDetails: state.goalDetails, chatPersona: state.chatPersona
           }
         })
       });
       if (!res.ok) showToast('저장에 실패했습니다. 다시 시도해주세요.');
     } catch (e) { showToast('저장에 실패했습니다. 다시 시도해주세요.'); }
+  }
+
+  // 회사 전체가 공유하는 설정(회사 비전/조직문화, 리더십 평가요소) - 개인 데이터(/api/data)와는
+  // 별도로 서버의 공용 테이블에 저장/조회된다. 조회는 누구나, 수정은 관리자(정/부)만 가능.
+  async function loadCompanySettings() {
+    try {
+      const res = await fetch('/api/company-settings');
+      if (res.ok) {
+        const parsed = await res.json();
+        state.companyProfile = parsed.companyProfile || '';
+        state.evalItems = parsed.evalItems || [];
+        state.evalItemDetails = parsed.evalItemDetails || {};
+      }
+    } catch (e) {}
+  }
+
+  async function saveCompanySettings(partial) {
+    try {
+      const res = await fetch('/api/company-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(partial)
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.detail || '저장에 실패했습니다.'); return false; }
+      return true;
+    } catch (e) { showToast('저장에 실패했습니다. 다시 시도해주세요.'); return false; }
   }
 
   function showToast(msg) {
@@ -693,7 +623,7 @@
     record: [['chat','대화형 기록하기'], ['add','직접 기록하기']],
     view: [['annual','연간 실적 · MBO 성과평가'], ['quarterly','분기별 · S-Talk'], ['browse','전체 기록 보기'], ['leadership','리더십 진단']],
     manage: [['mbo','MBO 목표'], ['people','인원 관리'], ['data','데이터 내보내기/가져오기']],
-    admin: [['permissions','권한 관리'], ['vision','회사 비전/조직문화'], ['evalitems','리더십 평가요소 관리']]
+    admin: [['permissions','권한 관리'], ['vision','회사 비전/조직문화'], ['evalitems','리더십 평가요소 관리'], ['teamaccounts','팀원 계정 관리']]
   };
   function activeSubFor(key) {
     if (key === 'record') return state.recordSubTab;
@@ -704,15 +634,23 @@
   }
 
   function renderTabs() {
+    const isAppAdmin = state.myRole === 'primary' || state.myRole === 'secondary';
+    const isServerAdmin = !!(window.__insysCurrentUser && window.__insysCurrentUser.role === 'admin');
     const tabs = [['manage','기본 설정/도구'], ['record','기록'], ['view','조회 및 다운로드']];
-    if (state.myRole === 'primary' || state.myRole === 'secondary') tabs.push(['admin','관리자 설정']);
-    if (window.__insysCurrentUser && window.__insysCurrentUser.role === 'admin') tabs.push(['teamaccounts','팀원 계정 관리']);
+    if (isAppAdmin || isServerAdmin) tabs.push(['admin','관리자 설정']);
     const html = tabs.map(([key, label]) => {
       let block = `<button class="wj-tab ${state.tab === key ? 'active' : ''}" data-tab="${key}">${label}</button>`;
       if (state.tab === key && SIDEBAR_SUBTABS[key]) {
         const activeSub = activeSubFor(key);
         let subItems = SIDEBAR_SUBTABS[key];
-        if (key === 'admin' && state.myRole !== 'primary') subItems = subItems.filter(([k]) => k !== 'permissions');
+        if (key === 'admin') {
+          subItems = subItems.filter(([k]) => {
+            if (k === 'permissions') return state.myRole === 'primary';
+            if (k === 'vision' || k === 'evalitems') return isAppAdmin;
+            if (k === 'teamaccounts') return isServerAdmin;
+            return true;
+          });
+        }
         block += `<div class="wj-sidebar-subtabs">${subItems.map(([subKey, subLabel]) =>
           `<button class="wj-sidebar-subtab ${activeSub === subKey ? 'active' : ''}" data-sidebar-sub="${key}:${subKey}">${subLabel}</button>`
         ).join('')}</div>`;
@@ -2440,10 +2378,15 @@ ${notesText || '(기록 없음)'}
 
   function renderAdminTab() {
     document.getElementById('wj-content').innerHTML = `<div id="wj-manage-body"></div>`;
+    const isAppAdmin = state.myRole === 'primary' || state.myRole === 'secondary';
+    const isServerAdmin = !!(window.__insysCurrentUser && window.__insysCurrentUser.role === 'admin');
     let sub = state.adminSubTab;
-    if (sub === 'permissions' && state.myRole !== 'primary') sub = 'vision';
+    if (sub === 'permissions' && state.myRole !== 'primary') sub = isAppAdmin ? 'vision' : 'teamaccounts';
+    if ((sub === 'vision' || sub === 'evalitems') && !isAppAdmin) sub = 'teamaccounts';
+    if (sub === 'teamaccounts' && !isServerAdmin) sub = isAppAdmin ? 'vision' : 'teamaccounts';
     if (sub === 'evalitems') renderManageEvalTab();
     else if (sub === 'permissions') renderAdminPermissionsTab();
+    else if (sub === 'teamaccounts') renderTeamAccountsTab();
     else renderManageVisionTab();
   }
 
@@ -2486,11 +2429,22 @@ ${notesText || '(기록 없음)'}
     });
   }
 
-  function renderAdminPermissionsTab() {
+  async function renderAdminPermissionsTab() {
+    document.getElementById('wj-manage-body').innerHTML = `<div class="wj-card"><div class="wj-empty">불러오는 중...</div></div>`;
+    let users = [];
+    try {
+      const res = await fetch('/api/app-admin/users');
+      if (res.ok) users = await res.json();
+    } catch (e) {}
+
+    const myEmail = window.__insysCurrentUser ? window.__insysCurrentUser.email : '';
+    const primaryUser = users.find(u => u.app_admin_role === 'primary');
+    const others = users.filter(u => u.app_admin_role !== 'primary');
+
     const html = `<div class="wj-card">
       <h3>권한 관리</h3>
-      <p class="wj-card-note">이 화면은 관리자(정)만 볼 수 있어요. 관리자(정)과 관리자(부)는 "회사 비전/조직문화", "리더십 평가요소 관리"를 수정할 수 있어요.</p>
-      <div class="wj-manage-row"><span>현재 관리자(정)</span><span class="wj-count-badge">${esc(state.adminPrimaryLabel || '본인')}</span></div>
+      <p class="wj-card-note">이 화면은 관리자(정)만 볼 수 있어요. 관리자(정)과 관리자(부)는 "회사 비전/조직문화", "리더십 평가요소 관리"를 수정할 수 있어요. 여기 나오는 목록은 실제 로그인 계정(이메일) 기준입니다.</p>
+      <div class="wj-manage-row"><span>현재 관리자(정)</span><span class="wj-count-badge">${esc(primaryUser ? primaryUser.email : '알수없음')}</span></div>
     </div>
 
     <div class="wj-card">
@@ -2498,14 +2452,14 @@ ${notesText || '(기록 없음)'}
       <p class="wj-card-note">양도하면 이 화면을 보고 있는 본인은 즉시 일반 권한으로 바뀌고, "관리자 설정" 메뉴 자체가 더 이상 보이지 않게 돼요. 신중하게 진행해주세요.</p>
       <div class="wj-select-row">
         <select class="wj-select" id="wj-transfer-primary-select">
-          <option value="">양도할 사람 선택</option>
-          ${state.people.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('')}
+          <option value="">양도할 계정 선택</option>
+          ${others.map(u => `<option value="${u.id}">${esc(u.email)}</option>`).join('')}
         </select>
         <button class="wj-btn danger-ghost" id="wj-transfer-primary-btn">양도하기</button>
       </div>
-      ${state.people.length === 0 ? `<p class="wj-card-note" style="margin-top:6px">양도할 대상이 없어요. '기본 설정/도구 &gt; 인원 관리'에서 구성원을 먼저 등록해주세요.</p>` : ''}
+      ${others.length === 0 ? `<p class="wj-card-note" style="margin-top:6px">양도할 다른 계정이 없어요. 팀원이 먼저 가입해야 합니다.</p>` : ''}
       ${state.confirmTransferPrimary ? `<div style="margin-top:10px">
-        <div class="wj-error-text" style="margin-bottom:8px">정말 "${esc(state.confirmTransferPrimary)}"에게 관리자(정) 권한을 넘기시겠어요? 이후 본인은 관리자 설정 메뉴에 접근할 수 없게 돼요.</div>
+        <div class="wj-error-text" style="margin-bottom:8px">정말 "${esc(state.confirmTransferPrimary.email)}"에게 관리자(정) 권한을 넘기시겠어요? 이후 본인은 관리자 설정 메뉴에 접근할 수 없게 돼요.</div>
         <div style="display:flex; gap:8px">
           <button class="wj-btn small" style="background:var(--danger)" id="wj-confirm-transfer-btn">양도 확정</button>
           <button class="wj-btn ghost small" id="wj-cancel-transfer-btn">취소</button>
@@ -2515,47 +2469,51 @@ ${notesText || '(기록 없음)'}
 
     <div class="wj-card">
       <h3>관리자(부) 지정</h3>
-      <p class="wj-card-note">체크한 구성원은 관리자(부) 권한을 가져요. "회사 비전/조직문화", "리더십 평가요소 관리"는 수정할 수 있지만, 이 "권한 관리" 화면은 볼 수 없어요.</p>
-      ${state.people.length === 0 ? `<div class="wj-empty">등록된 구성원이 없습니다. '기본 설정/도구 &gt; 인원 관리'에서 먼저 추가해보세요.</div>` :
-        state.people.map(p => `<div class="wj-manage-row">
-          <span>${esc(p)}</span>
+      <p class="wj-card-note">체크한 계정은 관리자(부) 권한을 가져요. "회사 비전/조직문화", "리더십 평가요소 관리"는 수정할 수 있지만, 이 "권한 관리" 화면은 볼 수 없어요.</p>
+      ${others.length === 0 ? `<div class="wj-empty">등록된 다른 계정이 없습니다.</div>` :
+        others.map(u => `<div class="wj-manage-row">
+          <span>${esc(u.email)}</span>
           <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer">
-            <input type="checkbox" data-secondary-toggle="${esc(p)}" ${state.adminSecondaryNames.includes(p) ? 'checked' : ''} /> 관리자(부)
+            <input type="checkbox" data-secondary-toggle="${u.id}" ${u.app_admin_role === 'secondary' ? 'checked' : ''} /> 관리자(부)
           </label>
         </div>`).join('')
       }
-    </div>
-
-    <div class="wj-card">
-      <p class="wj-card-note">🔒 참고: 이 앱은 혼자 쓰는 개인용 도구라, 지금은 실제로 다른 사람이 로그인해서 접근하는 구조가 아니에요. 이 권한 설정은 나중에 여러 명이 함께 쓰는 서버 버전으로 옮길 때 그대로 반영될 수 있도록 미리 준비해두는 용도예요. 지금은 "관리자(정) 권한 양도"를 누르면 본인 화면에서 관리자 설정 메뉴가 바로 사라지는 것까지만 확인할 수 있어요.</p>
     </div>`;
 
     document.getElementById('wj-manage-body').innerHTML = html;
 
     document.getElementById('wj-transfer-primary-btn').addEventListener('click', () => {
       const sel = document.getElementById('wj-transfer-primary-select').value;
-      if (!sel) { showToast('양도할 사람을 선택해주세요.'); return; }
-      state.confirmTransferPrimary = sel;
-      render();
+      if (!sel) { showToast('양도할 계정을 선택해주세요.'); return; }
+      const target = others.find(u => String(u.id) === String(sel));
+      state.confirmTransferPrimary = target;
+      renderAdminPermissionsTab();
     });
     const confirmBtn = document.getElementById('wj-confirm-transfer-btn');
-    if (confirmBtn) confirmBtn.addEventListener('click', () => {
-      state.adminPrimaryLabel = state.confirmTransferPrimary;
+    if (confirmBtn) confirmBtn.addEventListener('click', async () => {
+      const res = await fetch('/api/app-admin/transfer-primary', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId: state.confirmTransferPrimary.id })
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.detail || '양도에 실패했습니다.'); return; }
       state.myRole = 'member';
       state.confirmTransferPrimary = null;
       state.tab = 'manage';
-      saveData();
-      showToast(`관리자(정) 권한을 ${esc(state.adminPrimaryLabel)}님에게 넘겼습니다.`);
+      showToast(`관리자(정) 권한을 넘겼습니다.`);
       render();
     });
     const cancelBtn = document.getElementById('wj-cancel-transfer-btn');
-    if (cancelBtn) cancelBtn.addEventListener('click', () => { state.confirmTransferPrimary = null; render(); });
+    if (cancelBtn) cancelBtn.addEventListener('click', () => { state.confirmTransferPrimary = null; renderAdminPermissionsTab(); });
     document.querySelectorAll('[data-secondary-toggle]').forEach(cb => {
-      cb.addEventListener('change', (e) => {
-        const name = cb.dataset.secondaryToggle;
-        if (e.target.checked) { if (!state.adminSecondaryNames.includes(name)) state.adminSecondaryNames.push(name); }
-        else { state.adminSecondaryNames = state.adminSecondaryNames.filter(n => n !== name); }
-        saveData(); render();
+      cb.addEventListener('change', async (e) => {
+        const res = await fetch('/api/app-admin/secondary', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetUserId: parseInt(cb.dataset.secondaryToggle, 10), enabled: e.target.checked })
+        });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.detail || '변경에 실패했습니다.'); }
+        renderAdminPermissionsTab();
       });
     });
   }
@@ -2576,10 +2534,10 @@ ${notesText || '(기록 없음)'}
 
     document.getElementById('wj-manage-body').innerHTML = html;
 
-    document.getElementById('wj-save-company-profile').addEventListener('click', () => {
+    document.getElementById('wj-save-company-profile').addEventListener('click', async () => {
       state.companyProfile = document.getElementById('wj-company-profile').value;
-      saveData();
-      showToast('회사 비전/조직문화가 저장되었습니다.');
+      const ok = await saveCompanySettings({ companyProfile: state.companyProfile });
+      if (ok) showToast('회사 비전/조직문화가 저장되었습니다.');
     });
     document.getElementById('wj-profile-file-trigger').addEventListener('click', () => {
       document.getElementById('wj-profile-file-input').click();
@@ -2792,11 +2750,12 @@ ${notesText || '(기록 없음)'}
 
     document.getElementById('wj-manage-body').innerHTML = html;
 
-    document.getElementById('wj-add-eval').addEventListener('click', () => {
+    document.getElementById('wj-add-eval').addEventListener('click', async () => {
       const val = document.getElementById('wj-new-eval').value.trim();
       if (!val) return;
       if (!state.evalItems.includes(val)) state.evalItems.push(val);
-      saveData(); render();
+      const ok = await saveCompanySettings({ evalItems: state.evalItems });
+      if (ok) render();
     });
     document.querySelectorAll('[data-edit-eval]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -2811,7 +2770,7 @@ ${notesText || '(기록 없음)'}
     const editEvalInput = document.getElementById('wj-edit-eval-input');
     if (editEvalInput) editEvalInput.addEventListener('input', (e) => { state.editingEvalItemValue = e.target.value; });
     document.querySelectorAll('[data-save-eval]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const oldName = btn.dataset.saveEval;
         const newName = (state.editingEvalItemValue || '').trim();
         if (!newName) { showToast('평가요소 이름을 입력해주세요.'); return; }
@@ -2823,7 +2782,10 @@ ${notesText || '(기록 없음)'}
           delete state.evalItemDetails[oldName];
         }
         state.editingEvalItem = null;
-        saveData(); showToast('평가요소 이름이 수정되었습니다.'); render();
+        const ok = await saveCompanySettings({ evalItems: state.evalItems, evalItemDetails: state.evalItemDetails });
+        saveData(); // entries의 evalItem 태그 변경분 반영
+        if (ok) showToast('평가요소 이름이 수정되었습니다.');
+        render();
       });
     });
     document.querySelectorAll('[data-toggle-eval-detail]').forEach(btn => {
@@ -2834,25 +2796,28 @@ ${notesText || '(기록 없음)'}
       });
     });
     document.querySelectorAll('[data-save-eval-detail]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const idx = parseInt(btn.dataset.saveEvalDetail, 10);
         const name = state.evalItems[idx];
         const ta = document.getElementById(`wj-eval-detail-${idx}`);
         state.evalItemDetails[name] = ta.value;
-        saveData(); showToast('설명이 저장되었습니다.'); render();
+        const ok = await saveCompanySettings({ evalItemDetails: state.evalItemDetails });
+        if (ok) showToast('설명이 저장되었습니다.');
+        render();
       });
     });
     document.querySelectorAll('[data-del-eval]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         state.evalItems = state.evalItems.filter(it => it !== btn.dataset.delEval);
         delete state.evalItemDetails[btn.dataset.delEval];
-        saveData(); render();
+        const ok = await saveCompanySettings({ evalItems: state.evalItems, evalItemDetails: state.evalItemDetails });
+        if (ok) render();
       });
     });
   }
 
   async function renderTeamAccountsTab() {
-    document.getElementById('wj-content').innerHTML = `<div class="wj-card"><div class="wj-empty">불러오는 중...</div></div>`;
+    document.getElementById('wj-manage-body').innerHTML = `<div class="wj-card"><div class="wj-empty">불러오는 중...</div></div>`;
     let users = [];
     try {
       const res = await fetch('/api/admin/users');
@@ -2874,7 +2839,7 @@ ${notesText || '(기록 없음)'}
       </div>`).join('')}
     </div>`;
 
-    document.getElementById('wj-content').innerHTML = html;
+    document.getElementById('wj-manage-body').innerHTML = html;
 
     document.querySelectorAll('[data-team-role]').forEach(sel => {
       sel.addEventListener('change', async (e) => {
@@ -2899,8 +2864,9 @@ ${notesText || '(기록 없음)'}
   }
 
   function render() {
-    if (state.tab === 'admin' && state.myRole === 'member') state.tab = 'manage';
-    if (state.tab === 'teamaccounts' && !(window.__insysCurrentUser && window.__insysCurrentUser.role === 'admin')) state.tab = 'manage';
+    const isAppAdmin = state.myRole === 'primary' || state.myRole === 'secondary';
+    const isServerAdmin = !!(window.__insysCurrentUser && window.__insysCurrentUser.role === 'admin');
+    if (state.tab === 'admin' && !isAppAdmin && !isServerAdmin) state.tab = 'manage';
     renderTabs();
     if (!state.loaded) {
       document.getElementById('wj-content').innerHTML = `<div class="wj-empty">불러오는 중...</div>`;
@@ -2909,13 +2875,15 @@ ${notesText || '(기록 없음)'}
     if (state.tab === 'record') renderRecordTab();
     else if (state.tab === 'view') renderViewTab();
     else if (state.tab === 'admin') renderAdminTab();
-    else if (state.tab === 'teamaccounts') renderTeamAccountsTab();
     else renderManageTab();
   }
 
   window.__insysInit = function() {
     render();
     loadData();
+  };
+  window.__insysSetMyRole = function(role) {
+    state.myRole = role;
   };
 })();
 </script>
@@ -2973,6 +2941,7 @@ ${notesText || '(기록 없음)'}
     appShell.style.display = 'block';
     userBadge.textContent = `${userInfo.email}${userInfo.role === 'admin' ? ' · 계정관리자' : ''}`;
     window.__insysCurrentUser = userInfo;
+    if (window.__insysSetMyRole) window.__insysSetMyRole(userInfo.appAdminRole || 'member');
     window.__insysInit();
   }
 
