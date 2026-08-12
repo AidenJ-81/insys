@@ -508,7 +508,7 @@
     formContent: '', formStatus: '진행중', formEvalItem: '',
     viewPersonSel: '', viewGoalSel: '', personDeptFilter: '',
     recordSubTab: 'chat', viewSubTab: 'annual', manageSubTab: 'mbo', adminSubTab: 'permissions', quarterSel: '',
-    myRole: 'primary', confirmTransferPrimary: null,
+    myRole: 'member', confirmTransfer: null,
     gsConfirmDelete: null,
     gsGoalSel: '', gsDesc: '', gsScopeNotes: '', gsPeriodStart: '', gsPeriodEnd: '', gsWeight: '', gsModalOpen: false,
     aiLoading: false, aiStrengths: '', aiImprovements: '', aiError: '', aiForPerson: '', aiItems: [],
@@ -623,7 +623,7 @@
     record: [['chat','대화형 기록하기'], ['add','직접 기록하기']],
     view: [['annual','연간 실적 · MBO 성과평가'], ['quarterly','분기별 · S-Talk'], ['browse','전체 기록 보기'], ['leadership','리더십 진단']],
     manage: [['mbo','MBO 목표'], ['people','인원 관리'], ['data','데이터 내보내기/가져오기']],
-    admin: [['permissions','권한 관리'], ['vision','회사 비전/조직문화'], ['evalitems','리더십 평가요소 관리'], ['teamaccounts','팀원 계정 관리']]
+    admin: [['vision','회사 비전/조직문화'], ['evalitems','리더십 평가요소 관리'], ['team','팀원 권한 관리']]
   };
   function activeSubFor(key) {
     if (key === 'record') return state.recordSubTab;
@@ -634,22 +634,17 @@
   }
 
   function renderTabs() {
-    const isAppAdmin = state.myRole === 'primary' || state.myRole === 'secondary';
-    const isServerAdmin = !!(window.__insysCurrentUser && window.__insysCurrentUser.role === 'admin');
+    const isAdminOrHigher = state.myRole === 'admin' || state.myRole === 'account_admin';
+    const isAccountAdmin = state.myRole === 'account_admin';
     const tabs = [['manage','기본 설정/도구'], ['record','기록'], ['view','조회 및 다운로드']];
-    if (isAppAdmin || isServerAdmin) tabs.push(['admin','관리자 설정']);
+    if (isAdminOrHigher) tabs.push(['admin','관리자 설정']);
     const html = tabs.map(([key, label]) => {
       let block = `<button class="wj-tab ${state.tab === key ? 'active' : ''}" data-tab="${key}">${label}</button>`;
       if (state.tab === key && SIDEBAR_SUBTABS[key]) {
         const activeSub = activeSubFor(key);
         let subItems = SIDEBAR_SUBTABS[key];
         if (key === 'admin') {
-          subItems = subItems.filter(([k]) => {
-            if (k === 'permissions') return state.myRole === 'primary';
-            if (k === 'vision' || k === 'evalitems') return isAppAdmin;
-            if (k === 'teamaccounts') return isServerAdmin;
-            return true;
-          });
+          subItems = subItems.filter(([k]) => k === 'team' ? isAccountAdmin : true);
         }
         block += `<div class="wj-sidebar-subtabs">${subItems.map(([subKey, subLabel]) =>
           `<button class="wj-sidebar-subtab ${activeSub === subKey ? 'active' : ''}" data-sidebar-sub="${key}:${subKey}">${subLabel}</button>`
@@ -2378,15 +2373,11 @@ ${notesText || '(기록 없음)'}
 
   function renderAdminTab() {
     document.getElementById('wj-content').innerHTML = `<div id="wj-manage-body"></div>`;
-    const isAppAdmin = state.myRole === 'primary' || state.myRole === 'secondary';
-    const isServerAdmin = !!(window.__insysCurrentUser && window.__insysCurrentUser.role === 'admin');
+    const isAccountAdmin = state.myRole === 'account_admin';
     let sub = state.adminSubTab;
-    if (sub === 'permissions' && state.myRole !== 'primary') sub = isAppAdmin ? 'vision' : 'teamaccounts';
-    if ((sub === 'vision' || sub === 'evalitems') && !isAppAdmin) sub = 'teamaccounts';
-    if (sub === 'teamaccounts' && !isServerAdmin) sub = isAppAdmin ? 'vision' : 'teamaccounts';
+    if (sub === 'team' && !isAccountAdmin) sub = 'vision';
     if (sub === 'evalitems') renderManageEvalTab();
-    else if (sub === 'permissions') renderAdminPermissionsTab();
-    else if (sub === 'teamaccounts') renderTeamAccountsTab();
+    else if (sub === 'team') renderTeamAccessTab();
     else renderManageVisionTab();
   }
 
@@ -2429,93 +2420,106 @@ ${notesText || '(기록 없음)'}
     });
   }
 
-  async function renderAdminPermissionsTab() {
+  const ACCESS_LEVEL_LABEL = { account_admin: '계정관리자', admin: '관리자', member: '일반사용자' };
+
+  async function renderTeamAccessTab() {
     document.getElementById('wj-manage-body').innerHTML = `<div class="wj-card"><div class="wj-empty">불러오는 중...</div></div>`;
     let users = [];
     try {
-      const res = await fetch('/api/app-admin/users');
+      const res = await fetch('/api/access/users');
       if (res.ok) users = await res.json();
     } catch (e) {}
 
-    const myEmail = window.__insysCurrentUser ? window.__insysCurrentUser.email : '';
-    const primaryUser = users.find(u => u.app_admin_role === 'primary');
-    const others = users.filter(u => u.app_admin_role !== 'primary');
+    const others = users.filter(u => u.email !== (window.__insysCurrentUser && window.__insysCurrentUser.email));
+    const accountAdminCount = users.filter(u => u.access_level === 'account_admin').length;
 
     const html = `<div class="wj-card">
-      <h3>권한 관리</h3>
-      <p class="wj-card-note">이 화면은 관리자(정)만 볼 수 있어요. 관리자(정)과 관리자(부)는 "회사 비전/조직문화", "리더십 평가요소 관리"를 수정할 수 있어요. 여기 나오는 목록은 실제 로그인 계정(이메일) 기준입니다.</p>
-      <div class="wj-manage-row"><span>현재 관리자(정)</span><span class="wj-count-badge">${esc(primaryUser ? primaryUser.email : '알수없음')}</span></div>
+      <h3>팀원 권한 관리</h3>
+      <p class="wj-card-note">이 화면은 계정관리자만 볼 수 있어요. 권한은 <b>계정관리자 &gt; 관리자 &gt; 일반사용자</b> 순으로 상위가 하위 권한을 모두 포함해요. 계정관리자는 팀원 권한 관리를, 관리자는 회사 비전/조직문화·리더십 평가요소 관리를, 일반사용자는 그 외 모든 개인 기록 기능을 씁니다. 계정관리자는 최대 2명까지 지정할 수 있어요 (현재 ${accountAdminCount}명).</p>
+      ${users.map(u => {
+        const isMe = u.email === (window.__insysCurrentUser && window.__insysCurrentUser.email);
+        return `<div class="wj-manage-row">
+          <span>${esc(u.email)}${isMe ? ' <span class="wj-count-badge">나</span>' : ''} <span class="wj-count-badge">${ACCESS_LEVEL_LABEL[u.access_level] || u.access_level}</span></span>
+          <div style="display:flex; gap:6px; align-items:center">
+            <select class="wj-select" style="width:auto; padding:5px 8px; font-size:12.5px" data-set-level="${u.id}" ${isMe ? 'disabled' : ''}>
+              <option value="member" ${u.access_level==='member'?'selected':''}>일반사용자</option>
+              <option value="admin" ${u.access_level==='admin'?'selected':''}>관리자</option>
+              <option value="account_admin" ${u.access_level==='account_admin'?'selected':''}>계정관리자</option>
+            </select>
+            ${!isMe ? `<button class="wj-btn danger-ghost" data-remove-user="${u.id}">내보내기</button>` : ''}
+          </div>
+        </div>`;
+      }).join('')}
     </div>
 
     <div class="wj-card">
-      <h3>관리자(정) 권한 양도</h3>
-      <p class="wj-card-note">양도하면 이 화면을 보고 있는 본인은 즉시 일반 권한으로 바뀌고, "관리자 설정" 메뉴 자체가 더 이상 보이지 않게 돼요. 신중하게 진행해주세요.</p>
+      <h3>계정관리자 권한 양도</h3>
+      <p class="wj-card-note">본인의 계정관리자 자리를 다른 사람에게 넘기고, 본인은 관리자로 내려갑니다. 계정관리자 인원수는 그대로 유지돼요.</p>
       <div class="wj-select-row">
-        <select class="wj-select" id="wj-transfer-primary-select">
+        <select class="wj-select" id="wj-transfer-select">
           <option value="">양도할 계정 선택</option>
-          ${others.map(u => `<option value="${u.id}">${esc(u.email)}</option>`).join('')}
+          ${others.map(u => `<option value="${u.id}">${esc(u.email)} (${ACCESS_LEVEL_LABEL[u.access_level]})</option>`).join('')}
         </select>
-        <button class="wj-btn danger-ghost" id="wj-transfer-primary-btn">양도하기</button>
+        <button class="wj-btn danger-ghost" id="wj-transfer-btn">양도하기</button>
       </div>
       ${others.length === 0 ? `<p class="wj-card-note" style="margin-top:6px">양도할 다른 계정이 없어요. 팀원이 먼저 가입해야 합니다.</p>` : ''}
-      ${state.confirmTransferPrimary ? `<div style="margin-top:10px">
-        <div class="wj-error-text" style="margin-bottom:8px">정말 "${esc(state.confirmTransferPrimary.email)}"에게 관리자(정) 권한을 넘기시겠어요? 이후 본인은 관리자 설정 메뉴에 접근할 수 없게 돼요.</div>
+      ${state.confirmTransfer ? `<div style="margin-top:10px">
+        <div class="wj-error-text" style="margin-bottom:8px">정말 "${esc(state.confirmTransfer.email)}"에게 계정관리자 권한을 넘기시겠어요? 본인은 관리자로 내려가요.</div>
         <div style="display:flex; gap:8px">
           <button class="wj-btn small" style="background:var(--danger)" id="wj-confirm-transfer-btn">양도 확정</button>
           <button class="wj-btn ghost small" id="wj-cancel-transfer-btn">취소</button>
         </div>
       </div>` : ''}
-    </div>
-
-    <div class="wj-card">
-      <h3>관리자(부) 지정</h3>
-      <p class="wj-card-note">체크한 계정은 관리자(부) 권한을 가져요. "회사 비전/조직문화", "리더십 평가요소 관리"는 수정할 수 있지만, 이 "권한 관리" 화면은 볼 수 없어요.</p>
-      ${others.length === 0 ? `<div class="wj-empty">등록된 다른 계정이 없습니다.</div>` :
-        others.map(u => `<div class="wj-manage-row">
-          <span>${esc(u.email)}</span>
-          <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer">
-            <input type="checkbox" data-secondary-toggle="${u.id}" ${u.app_admin_role === 'secondary' ? 'checked' : ''} /> 관리자(부)
-          </label>
-        </div>`).join('')
-      }
     </div>`;
 
     document.getElementById('wj-manage-body').innerHTML = html;
 
-    document.getElementById('wj-transfer-primary-btn').addEventListener('click', () => {
-      const sel = document.getElementById('wj-transfer-primary-select').value;
+    document.querySelectorAll('[data-set-level]').forEach(sel => {
+      sel.addEventListener('change', async (e) => {
+        const res = await fetch('/api/access/set-level', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetUserId: parseInt(sel.dataset.setLevel, 10), level: e.target.value })
+        });
+        const data = await res.json();
+        if (!res.ok) showToast(data.detail || '변경에 실패했습니다.');
+        else showToast('권한이 변경되었습니다.');
+        renderTeamAccessTab();
+      });
+    });
+    document.querySelectorAll('[data-remove-user]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const res = await fetch('/api/access/remove', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetUserId: parseInt(btn.dataset.removeUser, 10) })
+        });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.detail || '내보내기에 실패했습니다.'); return; }
+        showToast('팀원을 내보냈습니다.');
+        renderTeamAccessTab();
+      });
+    });
+    document.getElementById('wj-transfer-btn').addEventListener('click', () => {
+      const sel = document.getElementById('wj-transfer-select').value;
       if (!sel) { showToast('양도할 계정을 선택해주세요.'); return; }
-      const target = others.find(u => String(u.id) === String(sel));
-      state.confirmTransferPrimary = target;
-      renderAdminPermissionsTab();
+      state.confirmTransfer = others.find(u => String(u.id) === String(sel));
+      renderTeamAccessTab();
     });
     const confirmBtn = document.getElementById('wj-confirm-transfer-btn');
     if (confirmBtn) confirmBtn.addEventListener('click', async () => {
-      const res = await fetch('/api/app-admin/transfer-primary', {
+      const res = await fetch('/api/access/transfer', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUserId: state.confirmTransferPrimary.id })
+        body: JSON.stringify({ targetUserId: state.confirmTransfer.id })
       });
       const data = await res.json();
       if (!res.ok) { showToast(data.detail || '양도에 실패했습니다.'); return; }
-      state.myRole = 'member';
-      state.confirmTransferPrimary = null;
-      state.tab = 'manage';
-      showToast(`관리자(정) 권한을 넘겼습니다.`);
+      state.myRole = 'admin';
+      state.confirmTransfer = null;
+      state.adminSubTab = 'vision';
+      showToast('계정관리자 권한을 넘겼습니다.');
       render();
     });
     const cancelBtn = document.getElementById('wj-cancel-transfer-btn');
-    if (cancelBtn) cancelBtn.addEventListener('click', () => { state.confirmTransferPrimary = null; renderAdminPermissionsTab(); });
-    document.querySelectorAll('[data-secondary-toggle]').forEach(cb => {
-      cb.addEventListener('change', async (e) => {
-        const res = await fetch('/api/app-admin/secondary', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetUserId: parseInt(cb.dataset.secondaryToggle, 10), enabled: e.target.checked })
-        });
-        const data = await res.json();
-        if (!res.ok) { showToast(data.detail || '변경에 실패했습니다.'); }
-        renderAdminPermissionsTab();
-      });
-    });
+    if (cancelBtn) cancelBtn.addEventListener('click', () => { state.confirmTransfer = null; renderTeamAccessTab(); });
   }
 
   function renderManageVisionTab() {
@@ -2816,57 +2820,9 @@ ${notesText || '(기록 없음)'}
     });
   }
 
-  async function renderTeamAccountsTab() {
-    document.getElementById('wj-manage-body').innerHTML = `<div class="wj-card"><div class="wj-empty">불러오는 중...</div></div>`;
-    let users = [];
-    try {
-      const res = await fetch('/api/admin/users');
-      if (res.ok) users = await res.json();
-    } catch (e) {}
-
-    const html = `<div class="wj-card">
-      <h3>팀원 계정 목록 (${users.length}명)</h3>
-      <p class="wj-card-note">누구나 가입 즉시 바로 사용할 수 있어요. 이 화면에서는 역할 변경과, 퇴사자 등 더 이상 접근하면 안 되는 계정을 내보내는 것만 할 수 있어요. 각 팀원의 개인 업무 기록 내용은 여기서도 조회할 수 없습니다.</p>
-      ${users.map(u => `<div class="wj-manage-row">
-        <span>${esc(u.email)} <span class="wj-count-badge">${u.role === 'admin' ? '계정관리자' : '일반'}</span></span>
-        <div style="display:flex; gap:6px; align-items:center">
-          <select class="wj-select" style="width:auto; padding:5px 8px; font-size:12.5px" data-team-role="${u.id}">
-            <option value="member" ${u.role==='member'?'selected':''}>일반</option>
-            <option value="admin" ${u.role==='admin'?'selected':''}>계정관리자</option>
-          </select>
-          <button class="wj-btn danger-ghost" data-team-remove="${u.id}">내보내기</button>
-        </div>
-      </div>`).join('')}
-    </div>`;
-
-    document.getElementById('wj-manage-body').innerHTML = html;
-
-    document.querySelectorAll('[data-team-role]').forEach(sel => {
-      sel.addEventListener('change', async (e) => {
-        const res = await fetch(`/api/admin/users/${sel.dataset.teamRole}/role`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ role: e.target.value })
-        });
-        const data = await res.json();
-        if (!res.ok) { showToast(data.detail || '변경에 실패했습니다.'); renderTeamAccountsTab(); return; }
-        showToast('역할이 변경되었습니다.');
-      });
-    });
-    document.querySelectorAll('[data-team-remove]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const res = await fetch(`/api/admin/users/${btn.dataset.teamRemove}/remove`, { method: 'POST' });
-        const data = await res.json();
-        if (!res.ok) { showToast(data.detail || '내보내기에 실패했습니다.'); return; }
-        showToast('팀원을 내보냈습니다.');
-        renderTeamAccountsTab();
-      });
-    });
-  }
-
   function render() {
-    const isAppAdmin = state.myRole === 'primary' || state.myRole === 'secondary';
-    const isServerAdmin = !!(window.__insysCurrentUser && window.__insysCurrentUser.role === 'admin');
-    if (state.tab === 'admin' && !isAppAdmin && !isServerAdmin) state.tab = 'manage';
+    const isAdminOrHigher = state.myRole === 'admin' || state.myRole === 'account_admin';
+    if (state.tab === 'admin' && !isAdminOrHigher) state.tab = 'manage';
     renderTabs();
     if (!state.loaded) {
       document.getElementById('wj-content').innerHTML = `<div class="wj-empty">불러오는 중...</div>`;
@@ -2936,12 +2892,14 @@ ${notesText || '(기록 없음)'}
     });
   }
 
+  const ACCESS_LEVEL_BADGE = { account_admin: ' · 계정관리자', admin: ' · 관리자', member: '' };
+
   async function showApp(userInfo) {
     authScreen.style.display = 'none';
     appShell.style.display = 'block';
-    userBadge.textContent = `${userInfo.email}${userInfo.role === 'admin' ? ' · 계정관리자' : ''}`;
+    userBadge.textContent = `${userInfo.email}${ACCESS_LEVEL_BADGE[userInfo.accessLevel] || ''}`;
     window.__insysCurrentUser = userInfo;
-    if (window.__insysSetMyRole) window.__insysSetMyRole(userInfo.appAdminRole || 'member');
+    if (window.__insysSetMyRole) window.__insysSetMyRole(userInfo.accessLevel || 'member');
     window.__insysInit();
   }
 

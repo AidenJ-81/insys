@@ -133,8 +133,7 @@ def init_db():
                 email TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
                 salt TEXT NOT NULL,
-                role TEXT NOT NULL DEFAULT 'member',
-                app_admin_role TEXT NOT NULL DEFAULT 'member',
+                access_level TEXT NOT NULL DEFAULT 'member',
                 approved INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL
             );
@@ -157,20 +156,42 @@ def init_db():
             );
             """
         )
-        # 기존 DB에 app_admin_role 컬럼이 없을 수 있으니 안전하게 추가 시도 (이미 있으면 무시)
-        try:
-            conn.execute("ALTER TABLE users ADD COLUMN app_admin_role TEXT NOT NULL DEFAULT 'member'")
-        except sqlite3.OperationalError:
-            pass
         conn.commit()
 
-        # 기존 DB를 업그레이드하는 경우, 관리자(정)이 아무도 없으면 가장 먼저 가입한 사람을 승격
-        primary_count = conn.execute("SELECT COUNT(*) c FROM users WHERE app_admin_role = 'primary'").fetchone()["c"]
-        if primary_count == 0:
+        # 기존 DB(이전 버전의 role / app_admin_role 컬럼)에서 업그레이드하는 경우를 대비한 안전한 마이그레이션.
+        cols = {row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+        if "access_level" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN access_level TEXT NOT NULL DEFAULT 'member'")
+            conn.commit()
+            if "role" in cols and "app_admin_role" in cols:
+                # 이전 이중 권한 체계를 새 단일 계층으로 합친다:
+                # role=admin 이면서 app_admin_role=primary 였던 사람 -> 계정관리자
+                # app_admin_role=secondary 였거나 role=admin 이었던 사람 -> 관리자
+                # 나머지 -> 일반사용자
+                conn.execute(
+                    "UPDATE users SET access_level = CASE "
+                    "WHEN role = 'admin' AND app_admin_role = 'primary' THEN 'account_admin' "
+                    "WHEN app_admin_role = 'secondary' OR role = 'admin' THEN 'admin' "
+                    "ELSE 'member' END"
+                )
+                conn.commit()
+
+        # 계정관리자가 한 명도 없으면 가장 먼저 가입한 사람을 승격
+        admin_count = conn.execute("SELECT COUNT(*) c FROM users WHERE access_level = 'account_admin'").fetchone()["c"]
+        if admin_count == 0:
             earliest = conn.execute("SELECT id FROM users ORDER BY created_at ASC LIMIT 1").fetchone()
             if earliest:
-                conn.execute("UPDATE users SET app_admin_role = 'primary' WHERE id = ?", (earliest["id"],))
+                conn.execute("UPDATE users SET access_level = 'account_admin' WHERE id = ?", (earliest["id"],))
                 conn.commit()
+
+        # 계정관리자가 2명을 초과하면(이전 데이터 등) 가장 최근 가입자부터 관리자로 강등해 2명으로 맞춘다.
+        admins = conn.execute(
+            "SELECT id FROM users WHERE access_level = 'account_admin' ORDER BY created_at ASC"
+        ).fetchall()
+        if len(admins) > 2:
+            for extra in admins[2:]:
+                conn.execute("UPDATE users SET access_level = 'admin' WHERE id = ?", (extra["id"],))
+            conn.commit()
 
         row = conn.execute("SELECT id FROM company_settings WHERE id = 1").fetchone()
         if not row:
@@ -239,25 +260,25 @@ def require_user(request: Request):
     return user
 
 
+ACCESS_LEVEL_ORDER = {"member": 0, "admin": 1, "account_admin": 2}
+
+
+def require_level(request: Request, min_level: str):
+    user = require_user(request)
+    user_rank = ACCESS_LEVEL_ORDER.get(user["access_level"], 0)
+    min_rank = ACCESS_LEVEL_ORDER.get(min_level, 0)
+    if user_rank < min_rank:
+        label = {"admin": "관리자", "account_admin": "계정관리자"}.get(min_level, min_level)
+        raise HTTPException(status_code=403, detail=f"{label} 권한이 필요합니다.")
+    return user
+
+
 def require_admin(request: Request):
-    user = require_user(request)
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="관리자만 접근할 수 있습니다.")
-    return user
+    return require_level(request, "admin")
 
 
-def require_app_admin(request: Request):
-    user = require_user(request)
-    if user["app_admin_role"] not in ("primary", "secondary"):
-        raise HTTPException(status_code=403, detail="관리자(정) 또는 관리자(부) 권한이 필요합니다.")
-    return user
-
-
-def require_app_primary(request: Request):
-    user = require_user(request)
-    if user["app_admin_role"] != "primary":
-        raise HTTPException(status_code=403, detail="관리자(정) 권한이 필요합니다.")
-    return user
+def require_account_admin(request: Request):
+    return require_level(request, "account_admin")
 
 
 def set_session_cookie(response: Response, token: str):
@@ -280,10 +301,6 @@ class AuthBody(BaseModel):
     password: str
 
 
-class RoleBody(BaseModel):
-    role: str
-
-
 class DataBody(BaseModel):
     data: dict
 
@@ -294,13 +311,17 @@ class CompanySettingsBody(BaseModel):
     evalItemDetails: Optional[dict] = None
 
 
-class TransferPrimaryBody(BaseModel):
+class SetLevelBody(BaseModel):
+    targetUserId: int
+    level: str  # 'account_admin' | 'admin' | 'member'
+
+
+class TransferBody(BaseModel):
     targetUserId: int
 
 
-class SecondaryBody(BaseModel):
+class RemoveUserBody(BaseModel):
     targetUserId: int
-    enabled: bool
 
 
 class AIBody(BaseModel):
@@ -330,10 +351,9 @@ def signup(body: AuthBody, response: Response):
         is_first = existing == 0
         try:
             cur = conn.execute(
-                "INSERT INTO users (email, password_hash, salt, role, app_admin_role, approved, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (email, pw_hash, salt, "admin" if is_first else "member",
-                 "primary" if is_first else "member", 1, now_iso()),
+                "INSERT INTO users (email, password_hash, salt, access_level, approved, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (email, pw_hash, salt, "account_admin" if is_first else "member", 1, now_iso()),
             )
         except sqlite3.IntegrityError:
             raise HTTPException(400, "이미 가입된 이메일입니다.")
@@ -349,8 +369,7 @@ def signup(body: AuthBody, response: Response):
     set_session_cookie(response, token)
     return {
         "status": "ok", "approved": True,
-        "role": "admin" if is_first else "member",
-        "appAdminRole": "primary" if is_first else "member",
+        "accessLevel": "account_admin" if is_first else "member",
     }
 
 
@@ -365,7 +384,7 @@ def login(body: AuthBody, response: Response):
         raise HTTPException(403, "관리자 승인 대기중입니다.")
     token = create_session(user["id"])
     set_session_cookie(response, token)
-    return {"status": "ok", "email": user["email"], "role": user["role"], "appAdminRole": user["app_admin_role"]}
+    return {"status": "ok", "email": user["email"], "accessLevel": user["access_level"]}
 
 
 @app.post("/api/auth/logout")
@@ -385,56 +404,93 @@ def me(request: Request):
     if not user:
         raise HTTPException(401, "로그인이 필요합니다.")
     return {
-        "email": user["email"], "role": user["role"], "approved": bool(user["approved"]),
-        "appAdminRole": user["app_admin_role"],
+        "email": user["email"], "approved": bool(user["approved"]),
+        "accessLevel": user["access_level"],
     }
 
 
 # ---------------------------------------------------------------------------
-# 관리자 API (팀원 관리)
+# 계정 접근권한 관리 API - 계정관리자(account_admin) 전용.
+# 계층: account_admin(최대 2명) > admin > member. 상위는 하위 권한을 모두 포함한다.
 # ---------------------------------------------------------------------------
-@app.get("/api/admin/users")
-def list_users(request: Request):
-    require_admin(request)
+MAX_ACCOUNT_ADMINS = 2
+
+
+@app.get("/api/access/users")
+def list_access_users(request: Request):
+    require_account_admin(request)
     with closing(get_db()) as conn:
         rows = conn.execute(
-            "SELECT id, email, role, approved, created_at FROM users ORDER BY created_at"
+            "SELECT id, email, access_level, approved, created_at FROM users ORDER BY created_at"
         ).fetchall()
     return [dict(r) for r in rows]
 
 
-@app.post("/api/admin/users/{user_id}/role")
-def change_role(user_id: int, body: RoleBody, request: Request):
-    require_admin(request)
-    if body.role not in ("admin", "member"):
-        raise HTTPException(400, "잘못된 역할입니다.")
+@app.post("/api/access/set-level")
+def set_access_level(body: SetLevelBody, request: Request):
+    require_account_admin(request)
+    if body.level not in ("account_admin", "admin", "member"):
+        raise HTTPException(400, "잘못된 권한입니다.")
     with closing(get_db()) as conn:
-        if body.role == "member":
-            admin_count = conn.execute("SELECT COUNT(*) c FROM users WHERE role='admin'").fetchone()["c"]
-            target = conn.execute("SELECT role FROM users WHERE id = ?", (user_id,)).fetchone()
-            if target and target["role"] == "admin" and admin_count <= 1:
-                raise HTTPException(400, "마지막 관리자는 일반으로 내릴 수 없습니다.")
-        conn.execute("UPDATE users SET role = ? WHERE id = ?", (body.role, user_id))
+        target = conn.execute("SELECT id, access_level FROM users WHERE id = ?", (body.targetUserId,)).fetchone()
+        if not target:
+            raise HTTPException(404, "대상 사용자를 찾을 수 없습니다.")
+
+        if body.level == "account_admin":
+            current_count = conn.execute(
+                "SELECT COUNT(*) c FROM users WHERE access_level = 'account_admin'"
+            ).fetchone()["c"]
+            if target["access_level"] != "account_admin" and current_count >= MAX_ACCOUNT_ADMINS:
+                raise HTTPException(400, f"계정관리자는 최대 {MAX_ACCOUNT_ADMINS}명까지만 지정할 수 있습니다.")
+        elif target["access_level"] == "account_admin":
+            # 계정관리자를 강등하는 경우, 마지막 한 명은 남겨둔다.
+            admin_count = conn.execute(
+                "SELECT COUNT(*) c FROM users WHERE access_level = 'account_admin'"
+            ).fetchone()["c"]
+            if admin_count <= 1:
+                raise HTTPException(400, "마지막 계정관리자는 강등할 수 없습니다. 먼저 양도해주세요.")
+
+        conn.execute("UPDATE users SET access_level = ? WHERE id = ?", (body.level, body.targetUserId))
         conn.commit()
     return {"status": "ok"}
 
 
-@app.post("/api/admin/users/{user_id}/remove")
-def remove_user(user_id: int, request: Request):
-    admin = require_admin(request)
-    if admin["id"] == user_id:
+@app.post("/api/access/transfer")
+def transfer_account_admin(body: TransferBody, request: Request):
+    current = require_account_admin(request)
+    if body.targetUserId == current["id"]:
+        raise HTTPException(400, "본인에게는 양도할 수 없습니다.")
+    with closing(get_db()) as conn:
+        target = conn.execute("SELECT id, access_level FROM users WHERE id = ?", (body.targetUserId,)).fetchone()
+        if not target:
+            raise HTTPException(404, "대상 사용자를 찾을 수 없습니다.")
+        if target["access_level"] == "account_admin":
+            raise HTTPException(400, "이미 계정관리자인 사용자입니다.")
+        # 본인의 계정관리자 자리를 대상에게 넘기고, 본인은 관리자로 내려간다 (인원수 그대로 유지).
+        conn.execute("UPDATE users SET access_level = 'admin' WHERE id = ?", (current["id"],))
+        conn.execute("UPDATE users SET access_level = 'account_admin' WHERE id = ?", (body.targetUserId,))
+        conn.commit()
+    return {"status": "ok"}
+
+
+@app.post("/api/access/remove")
+def remove_access_user(body: RemoveUserBody, request: Request):
+    current = require_account_admin(request)
+    if body.targetUserId == current["id"]:
         raise HTTPException(400, "본인 계정은 스스로 내보낼 수 없습니다.")
     with closing(get_db()) as conn:
-        target = conn.execute("SELECT role FROM users WHERE id = ?", (user_id,)).fetchone()
+        target = conn.execute("SELECT id, access_level FROM users WHERE id = ?", (body.targetUserId,)).fetchone()
         if not target:
             raise HTTPException(404, "사용자를 찾을 수 없습니다.")
-        if target["role"] == "admin":
-            admin_count = conn.execute("SELECT COUNT(*) c FROM users WHERE role='admin'").fetchone()["c"]
+        if target["access_level"] == "account_admin":
+            admin_count = conn.execute(
+                "SELECT COUNT(*) c FROM users WHERE access_level = 'account_admin'"
+            ).fetchone()["c"]
             if admin_count <= 1:
-                raise HTTPException(400, "마지막 관리자는 내보낼 수 없습니다.")
-        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
-        conn.execute("DELETE FROM user_data WHERE user_id = ?", (user_id,))
-        conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+                raise HTTPException(400, "마지막 계정관리자는 내보낼 수 없습니다.")
+        conn.execute("DELETE FROM users WHERE id = ?", (body.targetUserId,))
+        conn.execute("DELETE FROM user_data WHERE user_id = ?", (body.targetUserId,))
+        conn.execute("DELETE FROM sessions WHERE user_id = ?", (body.targetUserId,))
         conn.commit()
     return {"status": "ok"}
 
@@ -503,7 +559,7 @@ def get_company_settings(request: Request):
 
 @app.put("/api/company-settings")
 def put_company_settings(body: CompanySettingsBody, request: Request):
-    require_app_admin(request)
+    require_admin(request)
     with closing(get_db()) as conn:
         row = conn.execute(
             "SELECT company_profile, eval_items, eval_item_details FROM company_settings WHERE id = 1"
@@ -533,49 +589,6 @@ def put_company_settings(body: CompanySettingsBody, request: Request):
             "updated_at = excluded.updated_at",
             (payload_profile, payload_items, payload_details, now_iso()),
         )
-        conn.commit()
-    return {"status": "ok"}
-
-
-# ---------------------------------------------------------------------------
-# 앱 관리자(정/부) 권한 관리 - 서버 계정관리자(role)와는 별개의 권한 체계.
-# ---------------------------------------------------------------------------
-@app.get("/api/app-admin/users")
-def list_app_admin_users(request: Request):
-    require_app_primary(request)
-    with closing(get_db()) as conn:
-        rows = conn.execute(
-            "SELECT id, email, app_admin_role FROM users ORDER BY created_at"
-        ).fetchall()
-    return [dict(r) for r in rows]
-
-
-@app.post("/api/app-admin/transfer-primary")
-def transfer_primary(body: TransferPrimaryBody, request: Request):
-    current = require_app_primary(request)
-    if body.targetUserId == current["id"]:
-        raise HTTPException(400, "본인에게는 양도할 수 없습니다.")
-    with closing(get_db()) as conn:
-        target = conn.execute("SELECT id FROM users WHERE id = ?", (body.targetUserId,)).fetchone()
-        if not target:
-            raise HTTPException(404, "대상 사용자를 찾을 수 없습니다.")
-        conn.execute("UPDATE users SET app_admin_role = 'member' WHERE id = ?", (current["id"],))
-        conn.execute("UPDATE users SET app_admin_role = 'primary' WHERE id = ?", (body.targetUserId,))
-        conn.commit()
-    return {"status": "ok"}
-
-
-@app.post("/api/app-admin/secondary")
-def set_secondary(body: SecondaryBody, request: Request):
-    require_app_primary(request)
-    with closing(get_db()) as conn:
-        target = conn.execute("SELECT id, app_admin_role FROM users WHERE id = ?", (body.targetUserId,)).fetchone()
-        if not target:
-            raise HTTPException(404, "대상 사용자를 찾을 수 없습니다.")
-        if target["app_admin_role"] == "primary":
-            raise HTTPException(400, "관리자(정)의 역할은 여기서 바꿀 수 없습니다.")
-        new_role = "secondary" if body.enabled else "member"
-        conn.execute("UPDATE users SET app_admin_role = ? WHERE id = ?", (new_role, body.targetUserId))
         conn.commit()
     return {"status": "ok"}
 

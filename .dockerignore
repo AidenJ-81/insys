@@ -1,8 +1,8 @@
-node_modules
-npm-debug.log
-.env
-.env.*
-!.env.example
+__pycache__/
+*.pyc
 .git
 .gitignore
+data/
+*.db
+.env
 README.md
