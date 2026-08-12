@@ -1,4 +1,8 @@
-__pycache__
+__pycache__/
 *.pyc
 .git
-data
+.gitignore
+data/
+*.db
+.env
+README.md

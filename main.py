@@ -8,6 +8,7 @@ import urllib.error
 from contextlib import closing
 from pathlib import Path
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import FileResponse
@@ -159,8 +160,9 @@ class DataBody(BaseModel):
 
 
 class AIBody(BaseModel):
-    prompt: str
+    prompt: str = ""
     max_tokens: int = 1200
+    content: Optional[list] = None  # 이미지/문서 등 멀티모달 콘텐츠 블록 (있으면 prompt 대신 사용)
 
 
 # ---------------------------------------------------------------------------
@@ -342,12 +344,21 @@ def ai_complete(body: AIBody, request: Request):
     if not AI_API_KEY:
         raise HTTPException(500, "서버에 AI_API_KEY 환경변수가 설정되어 있지 않습니다.")
 
+    # 이미지/문서 등 멀티모달 콘텐츠가 오면 그대로 쓰고, 아니면 텍스트 프롬프트를 그대로 쓴다.
+    message_content = body.content if body.content else body.prompt
+    # anthropic 외의 제공자는 멀티모달 형식이 다를 수 있으므로, 텍스트 블록만 추려 폴백한다.
+    fallback_text_content = body.prompt
+    if body.content:
+        fallback_text_content = "\n".join(
+            block.get("text", "") for block in body.content if isinstance(block, dict) and block.get("type") == "text"
+        )
+
     if AI_PROVIDER == "anthropic":
         url = AI_BASE_URL or "https://api.anthropic.com/v1/messages"
         req_body = {
             "model": AI_MODEL,
             "max_tokens": body.max_tokens,
-            "messages": [{"role": "user", "content": body.prompt}],
+            "messages": [{"role": "user", "content": message_content}],
         }
         headers = {
             "Content-Type": "application/json",
@@ -363,7 +374,7 @@ def ai_complete(body: AIBody, request: Request):
         req_body = {
             "model": AI_MODEL,
             "max_tokens": body.max_tokens,
-            "messages": [{"role": "user", "content": body.prompt}],
+            "messages": [{"role": "user", "content": fallback_text_content}],
         }
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {AI_API_KEY}"}
         data = _post_json(url, req_body, headers)
@@ -380,7 +391,7 @@ def ai_complete(body: AIBody, request: Request):
             )
         base = (AI_BASE_URL or "https://gateway-api.wrks.ai").rstrip("/")
         url = f"{base}/v2/chat/json"
-        req_body = {"message": body.prompt, "agentId": AI_AGENT_ID}
+        req_body = {"message": fallback_text_content, "agentId": AI_AGENT_ID}
         headers = {
             "Content-Type": "application/json",
             "API-KEY": AI_API_KEY,
@@ -406,7 +417,7 @@ def ai_complete(body: AIBody, request: Request):
     req_body = {
         "model": AI_MODEL,
         "max_tokens": body.max_tokens,
-        "messages": [{"role": "user", "content": body.prompt}],
+        "messages": [{"role": "user", "content": fallback_text_content}],
     }
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {AI_API_KEY}"}
     data = _post_json(AI_BASE_URL, req_body, headers)

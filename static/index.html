@@ -163,6 +163,15 @@
   .wj-comment-block { margin-bottom: 14px; }
   .wj-comment-block-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
   .wj-comment-block-header span { font-size: 13px; font-weight: 700; }
+  .wj-eval-item-row { padding: 11px 0; border-top: 1px dashed var(--border); }
+  .wj-eval-item-row:first-child { border-top: none; }
+  .wj-eval-item-name { font-size: 13.5px; font-weight: 700; margin-bottom: 5px; }
+  .wj-eval-item-level {
+    display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 100px;
+    background: var(--gold-soft); color: var(--gold); margin-left: 6px; vertical-align: 1px;
+  }
+  .wj-eval-item-noev { font-size: 12.5px; color: var(--ink-soft); font-style: italic; }
+  .wj-eval-item-rationale { font-size: 12.5px; color: var(--ink); line-height: 1.6; }
   .wj-spinner-text { font-size: 13px; color: var(--ink-soft); display: flex; align-items: center; gap: 8px; }
   .wj-spinner {
     width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent);
@@ -201,22 +210,45 @@
   .wj-cal-header .wj-cal-title { font-size: 14px; font-weight: 700; }
   .wj-cal-nav-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--ink-soft); padding: 2px 10px; border-radius: 6px; }
   .wj-cal-nav-btn:hover { background: var(--bg); }
-  .wj-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px; }
-  .wj-cal-dow { text-align: center; font-size: 11px; color: var(--ink-soft); font-weight: 700; padding-bottom: 4px; }
-  .wj-cal-cell {
-    aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    border-radius: 8px; cursor: pointer; font-size: 12.5px; position: relative; border: 1px solid transparent;
+  .wj-cal-dow-row { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); margin-bottom: 4px; }
+  .wj-cal-dow { text-align: left; padding-left: 5px; font-size: 11px; color: var(--ink-soft); font-weight: 700; }
+  .wj-cal-month { display: flex; flex-direction: column; gap: 2px; }
+  .wj-cal-week {
+    display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); grid-auto-rows: min-content;
+    gap: 1px 2px; border-top: 1px solid var(--border); padding-top: 3px;
   }
-  .wj-cal-cell.empty { cursor: default; }
-  .wj-cal-cell:not(.empty):hover { background: var(--accent-soft); }
-  .wj-cal-cell.has-entries { font-weight: 700; border-color: var(--border); }
-  .wj-cal-cell.selected { background: var(--accent); color: #fff; }
-  .wj-cal-dot {
-    font-size: 9px; background: var(--gold); color: #fff; border-radius: 100px; padding: 0 4px;
-    position: absolute; bottom: 3px; line-height: 1.3;
+  .wj-cal-daycell {
+    padding: 2px 4px 4px; border-radius: 6px; cursor: pointer; min-height: 20px;
   }
-  .wj-cal-cell.selected .wj-cal-dot { background: #fff; color: var(--accent); }
+  .wj-cal-daycell:hover { background: var(--accent-soft); }
+  .wj-cal-daycell.muted { opacity: 0.4; }
+  .wj-cal-daynum { font-size: 13px; font-weight: 700; }
+  .wj-cal-bar {
+    border-radius: 4px; padding: 1px 6px; font-size: 10.5px; font-weight: 600; color: #fff;
+    cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  }
+  .wj-cal-bar:hover { filter: brightness(0.92); }
+  .wj-cal-overflow {
+    font-size: 10px; font-weight: 700; color: var(--ink-soft); padding: 1px 6px; cursor: pointer;
+  }
+  .wj-cal-overflow:hover { color: var(--accent); }
   .wj-load-more { text-align: center; margin-top: 10px; }
+
+  .wj-modal-overlay {
+    position: fixed; inset: 0; background: rgba(35,42,46,0.55); z-index: 100;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .wj-modal-box {
+    background: var(--surface); border-radius: 12px; max-width: 560px; width: 100%;
+    max-height: 82vh; overflow-y: auto; padding: 20px 20px 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  }
+  .wj-modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .wj-modal-header h3 { margin: 0; font-size: 16px; }
+  .wj-modal-close {
+    background: none; border: none; font-size: 20px; color: var(--ink-soft); cursor: pointer;
+    padding: 2px 8px; border-radius: 6px; line-height: 1;
+  }
+  .wj-modal-close:hover { background: var(--bg); }
   .wj-entry-chat-toggle {
     font-size: 11.5px; color: var(--accent); background: none; border: none; cursor: pointer; font-weight: 700;
     padding: 0; margin-left: 4px;
@@ -303,7 +335,7 @@
 
     <div class="wj-auth-field">
       <label class="wj-auth-label">이메일</label>
-      <input type="email" class="wj-auth-input" id="wj-auth-email" placeholder="you@company.com" />
+      <input type="email" class="wj-auth-input" id="wj-auth-email" placeholder="you@xicna.com" />
     </div>
     <div class="wj-auth-field">
       <label class="wj-auth-label">비밀번호</label>
@@ -418,10 +450,38 @@
     const firstDay = new Date(y, m - 1, 1);
     const startWeekday = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
     const daysInMonth = new Date(y, m, 0).getDate();
+    const totalCells = Math.ceil((startWeekday + daysInMonth) / 7) * 7;
+    const startDate = new Date(y, m - 1, 1 - startWeekday);
     const cells = [];
-    for (let i = 0; i < startWeekday; i++) cells.push(null);
-    for (let d = 1; d <= daysInMonth; d++) cells.push(`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
-    return cells;
+    for (let i = 0; i < totalCells; i++) {
+      const d = new Date(startDate);
+      d.setDate(startDate.getDate() + i);
+      cells.push({ dateStr: toDateStr(d), inMonth: d.getMonth() === m - 1 });
+    }
+    const weeks = [];
+    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+    return weeks;
+  }
+  const CAL_MAX_LANES = 3;
+  function computeWeekLanes(week, entries) {
+    const weekStart = week[0].dateStr;
+    const weekEnd = week[6].dateStr;
+    const touching = entries.filter(e => e.dateStart <= weekEnd && e.dateEnd >= weekStart)
+      .sort((a,b) => a.dateStart.localeCompare(b.dateStart) || b.dateEnd.localeCompare(a.dateEnd));
+    const lanes = [];
+    const placed = [];
+    touching.forEach(e => {
+      let startCol = week.findIndex(d => d.dateStr >= e.dateStart);
+      if (startCol === -1) startCol = 0;
+      let endCol = -1;
+      for (let i = 6; i >= 0; i--) { if (week[i].dateStr <= e.dateEnd) { endCol = i; break; } }
+      if (endCol === -1) endCol = 6;
+      let laneIdx = lanes.findIndex(endc => endc < startCol);
+      if (laneIdx === -1) { laneIdx = lanes.length; lanes.push(endCol); }
+      else { lanes[laneIdx] = endCol; }
+      placed.push({ entry: e, startCol, endCol, lane: laneIdx });
+    });
+    return placed;
   }
   function shiftMonth(yyyymm, delta) {
     const [y, m] = yyyymm.split('-').map(Number);
@@ -433,34 +493,120 @@
   function yearOf(dateStr) { return dateStr.split('-')[0]; }
 
   let state = {
-    tab: 'goal',
-    people: [], goals: [], evalItems: [], entries: [],
+    tab: 'manage',
+    people: [], goals: [], evalItems: [], evalItemDetails: {}, entries: [],
     departments: [], personDept: {},
     editingDept: null, editingDeptValue: '',
     editingPerson: null, editingPersonValue: '',
     importPreview: null, importPendingData: null, importError: '',
     editingEntryId: null, confirmDeleteId: null, addingAttachmentFor: null,
     editingGoal: null, editingGoalValue: '',
-    editingEvalItem: null, editingEvalItemValue: '',
+    editingEvalItem: null, editingEvalItemValue: '', expandedEvalDetail: {},
     goalDetails: {},
     formType: 'person', formTag: '', formNewTag: '',
     formDateStart: getWeekMonday(todayStr()), formDateEnd: getWeekSunday(todayStr()),
     formContent: '', formStatus: '진행중', formEvalItem: '',
     viewPersonSel: '', viewGoalSel: '', personDeptFilter: '',
-    recordSubTab: 'chat', viewSubTab: 'annual', quarterSel: '',
-    gsGoalSel: '', gsDesc: '', gsScopeNotes: '', gsPeriodStart: '', gsPeriodEnd: '', gsWeight: '',
-    aiLoading: false, aiStrengths: '', aiImprovements: '', aiError: '', aiForPerson: '',
+    recordSubTab: 'chat', viewSubTab: 'annual', manageSubTab: 'mbo', adminSubTab: 'permissions', quarterSel: '',
+    myRole: 'primary', adminPrimaryLabel: '본인', adminSecondaryNames: [], confirmTransferPrimary: null,
+    gsConfirmDelete: null,
+    gsGoalSel: '', gsDesc: '', gsScopeNotes: '', gsPeriodStart: '', gsPeriodEnd: '', gsWeight: '', gsModalOpen: false,
+    aiLoading: false, aiStrengths: '', aiImprovements: '', aiError: '', aiForPerson: '', aiItems: [],
+    selfDiagLoading: false, selfDiagItems: [], selfDiagStrengths: '', selfDiagImprovements: '',
+    selfDiagError: '', selfDiagGenerated: false,
     aiGoalSummaryLoading: false, aiGoalSummaryText: '', aiGoalSummaryError: '', aiGoalSummaryForGoal: '',
     aiQuarterSummaryLoading: false, aiQuarterSummaryText: '', aiQuarterSummaryError: '', aiQuarterSummaryForKey: '',
     aiQuarterSupportText: '',
     chatMessages: [], chatInput: '', chatLoading: false, chatPending: [], chatError: '',
-    chatPersona: 'default',
+    chatPersona: 'default', companyProfile: '', companyProfileDraft: '',
+    profileFileLoading: false, profileFileError: '',
     chatDateStart: getWeekMonday(todayStr()), chatDateEnd: getWeekSunday(todayStr()),
     chatWindowExpanded: false, expandedEntry: {}, awaitingAttachmentFor: null,
     browseSearch: '', browseCalMonth: todayStr().slice(0,7), browseSelectedDate: null,
-    browseVisibleCount: 20, browsePageSize: 20,
+    browseVisibleCount: 20, browsePageSize: 20, calendarModalDate: null,
     loaded: false
   };
+
+  const DEFAULT_EVAL_ITEMS = [
+    { name: '최적의 의사결정', desc:
+`[직책자] 합의가 어렵거나, 저항 및 부정적 반응이 예상되는 사안에 대해서도 분명하게 의사결정하는 리더입니까?
+[비직책자] 축적된 경험과 노하우를 기반으로 사안의 중요도와 우선순위를 고려하여 시의적절하게 대처하는 동료입니까?
+1~2점: 해당 업무 혹은 현안 이슈에 대한 이해와 전문지식/경험이 부족함
+3~5점: 본인 업무 및 타 분야의 업무지식까지 두루 갖추었으며, 복잡한 문제들의 근본원인을 파악하고 대안을 제시함
+6~7점: 새롭고 창의적인 방법론을 만들 수 있을 정도로 유능하며, 잠재적인 문제도 예측하여 새로운 대안을 수립함` },
+    { name: '신속한 의사결정 및 정보/의견 제공', desc:
+`[직책자] 다양한 대안들을 신속하게 검토하여 의사결정하는 리더입니까?
+[비직책자] 리더가 최적의 의사결정을 할 수 있도록 다양한 정보와 구성원들의 의견을 수집/제공할 수 있는 동료입니까?
+1~2점: 책임전가/회피를 위해 의도적으로 의사결정을 지연함
+3~5점: 수집된 정보/이슈 등을 정확히 분석하고, 의사결정시 적절히 활용함
+6~7점: 깊은 Insight를 바탕으로, 여러 대안들을 정확히 판단하고 의사결정의 파급효과까지 고려하여 적시에 의사결정함` },
+    { name: '업무의 조정/조율', desc:
+`[직책자] 팀 내 업무 공백 및 중복을 최소화하기 위해 팀원 간의 업무를 조율하거나 조정하는 리더입니까?
+[비직책자] 팀 내 업무 공백 및 중복 발생 여부를 파악하고, 업무를 조율 및 조정하는 데 능동적으로 참여하는 동료입니까?
+1~2점: 개인의 이익을 최우선시하며 본인의 업무효율만을 중요시함
+3~5점: 업무관련 절차를 준수하는 수준에서 팀 내 업무를 조정/조율함
+6~7점: 회사의 전략과 목표 달성을 위해 절차를 준수하며 성과창출에 기여할 수 있도록 팀 내 업무를 조정/조율함` },
+    { name: '구체적 정보제공 및 이슈사항 공유', desc:
+`[직책자] 구체적인 설명(배경, 산출물, 마감기한 등)과 함께 명확하게 업무를 지시하는 리더입니까?
+[비직책자] 업무 수행 과정에서 본인의 경험, 노하우를 기반으로 파악한 이슈사항을 구성원들에게 자발적으로 공유하는 동료입니까?
+1~2점: 업무에 대한 공유 및 지시가 매우 미흡함
+3~5점: 업무 수행과정에 있어 필요한 범위 내 공유함
+6~7점: 이슈사항을 구체적이고 명확하게 전달하며 본인의 경험을 자발적으로 공유함` },
+    { name: '업무추진사항 모니터링 및 장애요인 파악', desc:
+`[직책자] 구성원들의 업무 추진 현황을 지속적으로 모니터링하고, 개선이 필요한 부분을 파악하여 적절한 지시를 내리는 리더입니까?
+[비직책자] 구성원들의 성과 창출을 저해하는 요인을 파악하고, 해소할 수 있도록 의견을 제공할 수 있는 동료입니까?
+1~2점: '일단 하고보자'라는 식으로 무조건적인 실행만 강조하며, 업무 진척도를 주기적으로 관리하지 않음
+3~5점: 도전적 목표를 설정하고, 달성방법과 추진일정 등을 구체적으로 수립함
+6~7점: 실행 중 발생가능한 예상이슈를 사전에 발굴하고 대안까지 마련하며, 이슈 발생 시 즉각 개선 방안을 마련하여 강력히 실천함` },
+    { name: '환경변화에 따른 상황적응력', desc:
+`[직책자] 내/외부 환경 변화를 고려하며 업무의 우선순위를 조율 및 조정하는 리더입니까?
+[비직책자] 내/외부 환경 변화에 업무 수행 방식 및 수행 시기를 유연하게 변화시킬 수 있는 동료입니까?
+1~2점: 본인 업무 외 경영환경 및 시장 변화에 무관심하고, 단기적 목표 달성에 얽매이며 기존의 방식을 고수함
+3~5점: 단기적 이슈에 대응하는 수준이며, 본인 업무에 국한하여 개선을 시도함
+6~7점: 환경 변화를 예측하여 새로운 기회를 발굴하고, 이를 선점하기 위한 전략, 혁신방안을 개발/적용함` },
+    { name: '행동변화 독려 및 비전 정렬', desc:
+`[직책자] 내/외부 환경 변화에 대응하기 위해 본인은 물론 구성원들의 행동변화를 독려하는 리더입니까?
+[비직책자] 조직의 비전과 개인의 비전 간 연계를 위해 스스로 어떠한 노력을 해야하는지 계획을 구체화하고, 계획대로 실행하기 위해 노력하는 동료입니까?
+1~2점: 조직의 비전, 환경의 변화에 무관심하며 개인의 이익만을 최우선시하며 업무를 수행함
+3~5점: 본인의 행동변화를 개선하는 수준임
+6~7점: 환경변화에 대응하기 위해 스스로 노력하고 본인 뿐만 아니라 구성원들의 행동변화를 독려함` },
+    { name: '비전 및 목적 제시', desc:
+`[직책자] 조직의 비전과 목적에 대해 충분한 설명을 제시하고, 비전 달성에 대한 열정을 가질 수 있도록 독려하는 리더입니까?
+[비직책자] 조직의 비전 및 목적에 대해 충분히 이해하고 있으며, 비전 및 목적 달성에 열정을 가지고 있는 동료입니까?
+1~2점: 비전/미션 및 중장기 목표보다는 단기목표 달성에 얽매임
+3~5점: 조직의 비전과 미션을 명확히 제시하는 수준임
+6~7점: 조직의 비전과 구성원 개인간의 비전을 Alignment 하여, 구성원들의 자발적 참여를 유도함` },
+    { name: '적극적 소통 및 심리적안전감 조성', desc:
+`[직책자] 구성원들이 Speak Up 할 수 있도록 분위기를 조성하며 구성원들의 의견을 적극적으로 경청/수렴하는 리더입니까?
+[비직책자] 문제 해결을 위해 상대방의 의견을 경청하고, 새로운 아이디어와 접근 방식을 적극적으로 제안하는 동료입니까?
+1~2점: 이기주의 성향이 있으며 업무정보와 자원을 독점함
+3~5점: 평균적인 수준에서 헌신하며 조직 내에서 협력을 창출하기 위해 노력함
+6~7점: 회사 전체의 성과를 위해 개인과 부서의 이익도 기꺼이 희생하며, 구성원(동료)에게도 협력을 적극 독려함` },
+    { name: '코칭 및 피드백', desc:
+`[직책자] 적극적으로 자상하게 코칭하고 업무결과에 대하여 즉시 피드백 하며, 부하(후배)직원의 개인적 성장을 물심양면 지원하는 리더입니까?
+[비직책자] 동료의 성장과 업무적 성공을 위해 관심을 가지고 적극적으로 의견을 전달하는 동료입니까?
+1~2점: 구성원의 성장에 무관심하며 업무수행만을 강조함
+3~5점: 업무수행과 관련된 코칭/피드백은 있으나 구성원 개인의 장기적 성장에 대해서는 다소 무관심함
+6~7점: 평소 세밀하게 코칭하고 격려할 뿐만 아니라 개인의 성장에도 적극 관심을 가지고 다양하게 지원함` }
+  ];
+
+  const DEFAULT_COMPANY_PROFILE =
+`[비전] 국내 Top Tier 산업플랜트 Provider
+
+[핵심가치 및 조직문화 4대 지향점]
+- 혁신: 실패에서 배우고, 재발을 막는 조직
+- 전문성: 전문성을 최고의 가치로 여기는 조직
+- 사람중심: 오픈 커뮤니케이션이 당연한 조직
+- 동반성장: 부서·현장을 넘어 함께 움직이는 조직 (One-Team Spirit에 기반한 조직 플레이)
+
+[핵심가치 선순환 체계]
+역량에 대한 자신감이 생기면 틀릴 것을 두려워하지 않고 솔직하게 소통할 수 있다. 심리적 안전감이 보장된 조직에서는 같은 실패를 반복하지 않고 새로운 도전이 가능해진다. 이렇게 실패와 도전을 통해 축적된 경험을 함께 나누면 우리만의 자산이 되고, 신뢰를 기반으로 함께 성장함으로써 더욱 높은 수준의 전문성을 갖추게 된다.
+
+[2026년 슬로건]
+2026년 실행의 해 - 우리가 함께 만드는 조직문화. 자이C&A의 실행력은 우리가 함께 만드는 조직문화에서 시작된다.
+
+[마무리 메시지]
+우리는 배움을 두려워하지 않는 전문가이며, 언제나 솔직하게 소통하는 하나의 팀이다.`;
 
   const STORAGE_KEY = 'work-journal-data';
 
@@ -472,6 +618,7 @@
         state.people = parsed.people || [];
         state.goals = parsed.goals || [];
         state.evalItems = parsed.evalItems || [];
+        state.evalItemDetails = parsed.evalItemDetails || {};
         state.departments = parsed.departments || [];
         state.personDept = parsed.personDept || {};
         state.entries = parsed.entries || [];
@@ -485,8 +632,21 @@
         });
         state.goalDetails = parsed.goalDetails || {};
         state.chatPersona = parsed.chatPersona || 'default';
+        state.companyProfile = parsed.companyProfile || '';
+        state.myRole = parsed.myRole || 'primary';
+        state.adminPrimaryLabel = parsed.adminPrimaryLabel || '본인';
+        state.adminSecondaryNames = parsed.adminSecondaryNames || [];
       }
     } catch (e) {}
+    if (state.evalItems.length === 0 && Object.keys(state.evalItemDetails).length === 0) {
+      state.evalItems = DEFAULT_EVAL_ITEMS.map(it => it.name);
+      DEFAULT_EVAL_ITEMS.forEach(it => { state.evalItemDetails[it.name] = it.desc; });
+      saveData();
+    }
+    if (!state.companyProfile) {
+      state.companyProfile = DEFAULT_COMPANY_PROFILE;
+      saveData();
+    }
     state.loaded = true;
     render();
   }
@@ -498,9 +658,11 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           data: {
-            people: state.people, goals: state.goals, evalItems: state.evalItems,
+            people: state.people, goals: state.goals, evalItems: state.evalItems, evalItemDetails: state.evalItemDetails,
             departments: state.departments, personDept: state.personDept,
-            entries: state.entries, goalDetails: state.goalDetails, chatPersona: state.chatPersona
+            entries: state.entries, goalDetails: state.goalDetails, chatPersona: state.chatPersona,
+            companyProfile: state.companyProfile,
+            myRole: state.myRole, adminPrimaryLabel: state.adminPrimaryLabel, adminSecondaryNames: state.adminSecondaryNames
           }
         })
       });
@@ -529,19 +691,29 @@
 
   const SIDEBAR_SUBTABS = {
     record: [['chat','대화형 기록하기'], ['add','직접 기록하기']],
-    view: [['annual','연간 실적 · MBO 성과평가'], ['quarterly','분기별 · S-Talk'], ['browse','전체 기록 보기'], ['leadership','리더십 진단']]
+    view: [['annual','연간 실적 · MBO 성과평가'], ['quarterly','분기별 · S-Talk'], ['browse','전체 기록 보기'], ['leadership','리더십 진단']],
+    manage: [['mbo','MBO 목표'], ['people','인원 관리'], ['data','데이터 내보내기/가져오기']],
+    admin: [['permissions','권한 관리'], ['vision','회사 비전/조직문화'], ['evalitems','리더십 평가요소 관리']]
   };
+  function activeSubFor(key) {
+    if (key === 'record') return state.recordSubTab;
+    if (key === 'view') return state.viewSubTab;
+    if (key === 'manage') return state.manageSubTab;
+    if (key === 'admin') return state.adminSubTab;
+    return null;
+  }
 
   function renderTabs() {
-    const tabs = [['goal','MBO 목표 작성'], ['record','기록'], ['view','조회 및 다운로드'], ['manage','관리']];
-    if (window.__insysCurrentUser && window.__insysCurrentUser.role === 'admin') {
-      tabs.push(['admin','팀원 관리']);
-    }
+    const tabs = [['manage','기본 설정/도구'], ['record','기록'], ['view','조회 및 다운로드']];
+    if (state.myRole === 'primary' || state.myRole === 'secondary') tabs.push(['admin','관리자 설정']);
+    if (window.__insysCurrentUser && window.__insysCurrentUser.role === 'admin') tabs.push(['teamaccounts','팀원 계정 관리']);
     const html = tabs.map(([key, label]) => {
       let block = `<button class="wj-tab ${state.tab === key ? 'active' : ''}" data-tab="${key}">${label}</button>`;
       if (state.tab === key && SIDEBAR_SUBTABS[key]) {
-        const activeSub = key === 'record' ? state.recordSubTab : state.viewSubTab;
-        block += `<div class="wj-sidebar-subtabs">${SIDEBAR_SUBTABS[key].map(([subKey, subLabel]) =>
+        const activeSub = activeSubFor(key);
+        let subItems = SIDEBAR_SUBTABS[key];
+        if (key === 'admin' && state.myRole !== 'primary') subItems = subItems.filter(([k]) => k !== 'permissions');
+        block += `<div class="wj-sidebar-subtabs">${subItems.map(([subKey, subLabel]) =>
           `<button class="wj-sidebar-subtab ${activeSub === subKey ? 'active' : ''}" data-sidebar-sub="${key}:${subKey}">${subLabel}</button>`
         ).join('')}</div>`;
       }
@@ -557,6 +729,8 @@
         const [tabKey, subKey] = btn.dataset.sidebarSub.split(':');
         if (tabKey === 'record') state.recordSubTab = subKey;
         else if (tabKey === 'view') state.viewSubTab = subKey;
+        else if (tabKey === 'manage') state.manageSubTab = subKey;
+        else if (tabKey === 'admin') state.adminSubTab = subKey;
         render();
       });
     });
@@ -880,7 +1054,7 @@
     }
 
     if (state.goals.length === 0) {
-      document.getElementById('wj-view-body').insertAdjacentHTML('beforeend', `<div class="wj-card"><div class="wj-empty">아직 등록된 업무/목표가 없습니다. 'MBO 목표 작성' 탭에서 먼저 추가해보세요.</div></div>`);
+      document.getElementById('wj-view-body').insertAdjacentHTML('beforeend', `<div class="wj-card"><div class="wj-empty">아직 등록된 업무/목표가 없습니다. '기본 설정/도구 &gt; MBO 목표'에서 먼저 추가해보세요.</div></div>`);
       return;
     }
 
@@ -904,7 +1078,7 @@
         <span class="wj-field-label-hint" style="background:var(--gold)">목표 기준과 대조한 1차 성과 요약</span>
         <h3>${esc(sel)} - AI 1차 정리</h3>
         <p class="wj-card-note">이 목표의 달성방안/목표수준(S~D 기준)과 지금까지 쌓인 기록을 대조해서, 어느 수준에 해당하는지 1차로 정리해드려요. 최종 판단이 아니라 초안이니 꼭 검토해주세요.</p>
-        ${!goalDesc ? `<div class="wj-empty">이 목표의 달성방안/목표수준이 아직 작성되지 않았어요. 'MBO 목표 작성' 탭에서 먼저 기준을 입력하면 더 정확하게 정리해드릴 수 있어요.</div>` : ''}
+        ${!goalDesc ? `<div class="wj-empty">이 목표의 달성방안/목표수준이 아직 작성되지 않았어요. '기본 설정/도구 &gt; MBO 목표'에서 먼저 기준을 입력하면 더 정확하게 정리해드릴 수 있어요.</div>` : ''}
         ${entries.length === 0 ? `<div class="wj-empty">이 목표에 대한 기록이 아직 없습니다.</div>` : `
           <button class="wj-btn secondary" id="wj-gen-goal-summary" ${state.aiGoalSummaryLoading ? 'disabled' : ''}>
             ${state.aiGoalSummaryLoading ? '정리 중...' : 'AI로 1차 성과 요약 받기'}
@@ -1483,22 +1657,19 @@ reply 필드:
   function renderBrowseSubTab() {
     const container = document.getElementById('wj-view-body');
     const search = (state.browseSearch || '').trim().toLowerCase();
-    const selectedDate = state.browseSelectedDate;
 
     const filtered = state.entries.filter(e => {
-      const matchesSearch = !search || e.content.toLowerCase().includes(search) || e.tag.toLowerCase().includes(search);
-      const matchesDate = !selectedDate || entryCoversDate(e, selectedDate);
-      return matchesSearch && matchesDate;
+      return !search || e.content.toLowerCase().includes(search) || e.tag.toLowerCase().includes(search);
     }).sort((a,b) => b.dateStart.localeCompare(a.dateStart) || b.createdAt - a.createdAt);
 
     const visible = filtered.slice(0, state.browseVisibleCount);
     const [calYear, calMonth] = state.browseCalMonth.split('-');
-    const cells = getMonthMatrix(state.browseCalMonth);
+    const weeks = getMonthMatrix(state.browseCalMonth);
     const dow = ['월','화','수','목','금','토','일'];
 
     let html = `<div class="wj-card">
       <h3>전체 기록 보기</h3>
-      <p class="wj-card-note">내용으로 검색하거나, 달력에서 날짜를 눌러 그 기간에 걸치는 기록만 볼 수 있어요.</p>
+      <p class="wj-card-note">내용으로 검색하거나, 달력에서 날짜/막대를 눌러 그날 걸치는 기록을 팝업으로 볼 수 있어요.</p>
       <div class="wj-field">
         <input class="wj-input" id="wj-browse-search" placeholder="내용이나 이름으로 검색" value="${esc(state.browseSearch)}" />
       </div>
@@ -1507,20 +1678,35 @@ reply 필드:
         <span class="wj-cal-title">${calYear}년 ${parseInt(calMonth,10)}월</span>
         <button class="wj-cal-nav-btn" data-cal-nav="1">›</button>
       </div>
-      <div class="wj-cal-grid">
+      <div class="wj-cal-dow-row">
         ${dow.map(d => `<div class="wj-cal-dow">${d}</div>`).join('')}
-        ${cells.map(dateStr => {
-          if (!dateStr) return `<div class="wj-cal-cell empty"></div>`;
-          const count = state.entries.filter(e => entryCoversDate(e, dateStr)).length;
-          const isSelected = selectedDate === dateStr;
-          const dayNum = parseInt(dateStr.split('-')[2], 10);
-          return `<div class="wj-cal-cell ${isSelected ? 'selected' : ''} ${count > 0 ? 'has-entries' : ''}" data-cal-day="${dateStr}">
-            <span>${dayNum}</span>
-            ${count > 0 ? `<span class="wj-cal-dot">${count}</span>` : ''}
-          </div>`;
+      </div>
+      <div class="wj-cal-month">
+        ${weeks.map(week => {
+          const placed = computeWeekLanes(week, state.entries);
+          const visiblePlaced = placed.filter(p => p.lane < CAL_MAX_LANES);
+          const hiddenPlaced = placed.filter(p => p.lane >= CAL_MAX_LANES);
+
+          const dayCells = week.map((day, i) => {
+            const dayNum = parseInt(day.dateStr.split('-')[2], 10);
+            return `<div class="wj-cal-daycell ${day.inMonth ? '' : 'muted'}" style="grid-column:${i+1}; grid-row:1;" data-cal-day="${day.dateStr}">
+              <span class="wj-cal-daynum">${dayNum}</span>
+            </div>`;
+          }).join('');
+
+          const barCells = visiblePlaced.map(p => `
+            <div class="wj-cal-bar" style="grid-column:${p.startCol+1} / ${p.endCol+2}; grid-row:${p.lane+2}; background:${colorFor(p.entry.tag)}" data-cal-day="${p.entry.dateStart}" title="${esc(p.entry.tag)}: ${esc(p.entry.content)}">${esc(p.entry.tag)}</div>
+          `).join('');
+
+          const overflowByDay = week.map((day, i) => hiddenPlaced.filter(p => p.startCol <= i && i <= p.endCol).length);
+          const overflowCells = overflowByDay.map((count, i) => count > 0
+            ? `<div class="wj-cal-overflow" style="grid-column:${i+1}; grid-row:${CAL_MAX_LANES+2};" data-cal-day="${week[i].dateStr}">+${count}</div>`
+            : ''
+          ).join('');
+
+          return `<div class="wj-cal-week">${dayCells}${barCells}${overflowCells}</div>`;
         }).join('')}
       </div>
-      ${selectedDate ? `<div style="margin-top:8px"><span class="wj-count-badge">${selectedDate} 필터 적용 중</span> <button class="wj-btn ghost small" id="wj-cal-clear" style="margin-left:6px">필터 해제</button></div>` : ''}
     </div>
 
     <div class="wj-card">
@@ -1528,6 +1714,21 @@ reply 필드:
       ${renderEntryList(visible, true)}
       ${filtered.length > visible.length ? `<div class="wj-load-more"><button class="wj-btn ghost" id="wj-load-more-btn">더 보기 (${filtered.length - visible.length}건 더 있음)</button></div>` : ''}
     </div>`;
+
+    if (state.calendarModalDate) {
+      const d = state.calendarModalDate;
+      const dayEntries = state.entries.filter(e => entryCoversDate(e, d))
+        .sort((a,b) => b.dateStart.localeCompare(a.dateStart) || b.createdAt - a.createdAt);
+      html += `<div class="wj-modal-overlay" id="wj-cal-modal-overlay">
+        <div class="wj-modal-box" id="wj-cal-modal-box">
+          <div class="wj-modal-header">
+            <h3>${d} 기록 (${dayEntries.length}건)</h3>
+            <button class="wj-modal-close" id="wj-cal-modal-close">×</button>
+          </div>
+          ${renderEntryList(dayEntries, true)}
+        </div>
+      </div>`;
+    }
 
     container.innerHTML = html;
 
@@ -1544,78 +1745,42 @@ reply 필드:
     });
     document.querySelectorAll('[data-cal-day]').forEach(cell => {
       cell.addEventListener('click', () => {
-        const d = cell.dataset.calDay;
-        state.browseSelectedDate = state.browseSelectedDate === d ? null : d;
-        state.browseVisibleCount = state.browsePageSize;
+        state.calendarModalDate = cell.dataset.calDay;
         renderBrowseSubTab();
       });
-    });
-    const clearBtn = document.getElementById('wj-cal-clear');
-    if (clearBtn) clearBtn.addEventListener('click', () => {
-      state.browseSelectedDate = null;
-      state.browseVisibleCount = state.browsePageSize;
-      renderBrowseSubTab();
     });
     const loadMoreBtn = document.getElementById('wj-load-more-btn');
     if (loadMoreBtn) loadMoreBtn.addEventListener('click', () => {
       state.browseVisibleCount += state.browsePageSize;
       renderBrowseSubTab();
     });
+
+    const modalOverlay = document.getElementById('wj-cal-modal-overlay');
+    if (modalOverlay) {
+      modalOverlay.addEventListener('click', (e) => {
+        if (e.target === modalOverlay) { state.calendarModalDate = null; renderBrowseSubTab(); }
+      });
+      document.getElementById('wj-cal-modal-close').addEventListener('click', () => {
+        state.calendarModalDate = null;
+        renderBrowseSubTab();
+      });
+    }
+
     attachDeleteHandlers();
   }
 
-  function renderGoalTab() {
-    document.getElementById('wj-content').innerHTML = '';
-    renderGoalSettingSubTab();
-  }
-
   function renderGoalSettingSubTab() {
-    const container = document.getElementById('wj-content');
-    const editingNew = !state.gsGoalSel;
+    const container = document.getElementById('wj-manage-body');
     const totalWeight = state.goals.reduce((sum, g) => sum + (parseFloat((state.goalDetails[g]||{}).weight) || 0), 0);
 
     let html = `<div class="wj-card">
       <span class="wj-field-label-hint">MBO 목표 &gt; 목표입력 화면에 붙여넣기</span>
       <h3>연초 목표 작성</h3>
       <p class="wj-card-note">이미지1 화면의 "목표입력" 표(목표 / 달성방안·목표수준 / 기간 / 가중치)와 같은 형식으로 정리합니다.</p>
-      <div class="wj-field">
-        <label class="wj-label">목표 선택</label>
-        <div class="wj-select-row">
-          <select class="wj-select" id="wj-gs-select">
-            <option value="">+ 새 목표 만들기</option>
-            ${state.goals.map(g => `<option value="${esc(g)}" ${state.gsGoalSel===g?'selected':''}>${esc(g)}</option>`).join('')}
-          </select>
-          ${state.goals.length > 0 ? `<span class="wj-count-badge">가중치 합계 ${totalWeight}%</span>` : ''}
-        </div>
+      <div class="wj-select-row" style="margin-bottom:4px">
+        <button class="wj-btn" id="wj-gs-open-new">+ 새 목표 작성</button>
+        ${state.goals.length > 0 ? `<span class="wj-count-badge">가중치 합계 ${totalWeight}%</span>` : ''}
       </div>
-      ${editingNew ? `<div class="wj-field">
-        <label class="wj-label">새 목표 이름</label>
-        <input class="wj-input" id="wj-gs-newname" />
-      </div>` : ''}
-      <div class="wj-field">
-        <label class="wj-label">달성방안 / 목표수준</label>
-        <textarea class="wj-textarea" id="wj-gs-desc" style="min-height:220px; font-size:14.5px; line-height:1.7">${esc(state.gsDesc)}</textarea>
-      </div>
-      <div class="wj-field">
-        <label class="wj-label">포함되는 활동 예시 (선택 — AI가 기록을 분류할 때 최우선으로 참고해요)</label>
-        <p class="wj-card-note" style="margin-top:-2px">등급 기준과는 별개로, "이런 활동이 이 목표에 해당한다/안 한다"는 경계를 직접 정의해두세요. 다른 목표와 헷갈리기 쉬운 용어일수록 효과가 커요. 예: "특화AI = 계약서 검토 AI처럼 특정 업무 하나에 맞춘 모델. 범용 챗봇 도입은 [범용AI 도입] 목표에 해당함"</p>
-        <textarea class="wj-textarea" id="wj-gs-scope" style="min-height:120px; font-size:14px; line-height:1.6">${esc(state.gsScopeNotes)}</textarea>
-      </div>
-      <div class="wj-row2 wj-field">
-        <div>
-          <label class="wj-label">기간 시작</label>
-          <input type="date" class="wj-input" id="wj-gs-start" value="${esc(state.gsPeriodStart)}" />
-        </div>
-        <div>
-          <label class="wj-label">기간 종료</label>
-          <input type="date" class="wj-input" id="wj-gs-end" value="${esc(state.gsPeriodEnd)}" />
-        </div>
-        <div>
-          <label class="wj-label">가중치 (%)</label>
-          <input type="number" class="wj-input" id="wj-gs-weight" value="${esc(state.gsWeight)}" placeholder="20" />
-        </div>
-      </div>
-      <button class="wj-btn" id="wj-gs-save">${editingNew ? '새 목표로 저장' : '이 목표 내용 저장'}</button>
     </div>`;
 
     if (state.goals.length > 0) {
@@ -1625,27 +1790,119 @@ reply 필드:
         ${state.goals.map((g, i) => {
           const d = state.goalDetails[g] || {};
           const block = `${i+1}. ${g}\n[달성방안/목표수준]\n${d.description || '(미작성)'}\n[기간] ${d.periodStart || '?'} ~ ${d.periodEnd || '?'}\n[가중치] ${d.weight || 0}%`;
-          return `<div class="wj-preview" style="margin-bottom:8px">${esc(block)}</div>
-            ${d.scopeNotes ? `<div class="wj-card-note" style="margin:-4px 0 12px">↳ 포함되는 활동 예시 (회사 시스템엔 붙여넣지 않는, AI 분류 참고용): ${esc(d.scopeNotes)}</div>` : ''}`;
+          const confirming = state.gsConfirmDelete === g;
+          return `<div class="wj-manage-row" style="align-items:flex-start">
+            <div class="wj-preview" style="margin-bottom:0; flex:1">${esc(block)}</div>
+            <div style="display:flex; flex-direction:column; gap:6px; margin-left:10px; align-items:stretch">
+              ${confirming ? `
+                <button class="wj-btn small" style="background:var(--danger)" data-gs-confirm-delete="${esc(g)}">삭제 확인</button>
+                <button class="wj-btn ghost small" data-gs-cancel-delete="1">취소</button>
+              ` : `
+                <button class="wj-btn ghost small" data-gs-open-edit="${esc(g)}">수정</button>
+                <button class="wj-btn danger-ghost" data-gs-ask-delete="${esc(g)}">삭제</button>
+              `}
+            </div>
+          </div>
+            ${d.scopeNotes ? `<div class="wj-card-note" style="margin:4px 0 12px">↳ 포함되는 활동 예시 (회사 시스템엔 붙여넣지 않는, AI 분류 참고용): ${esc(d.scopeNotes)}</div>` : ''}`;
         }).join('')}
         <button class="wj-btn secondary" id="wj-gs-copy-all">전체 목표 복사</button>
       </div>`;
     }
 
+    if (state.gsModalOpen) {
+      const editingNew = !state.gsGoalSel;
+      html += `<div class="wj-modal-overlay" id="wj-gs-modal-overlay">
+        <div class="wj-modal-box">
+          <div class="wj-modal-header">
+            <h3>${editingNew ? '새 목표 작성' : `목표 수정 - ${esc(state.gsGoalSel)}`}</h3>
+            <button class="wj-modal-close" id="wj-gs-modal-close">×</button>
+          </div>
+          ${editingNew ? `<div class="wj-field">
+            <label class="wj-label">새 목표 이름</label>
+            <input class="wj-input" id="wj-gs-newname" />
+          </div>` : ''}
+          <div class="wj-field">
+            <label class="wj-label">달성방안 / 목표수준</label>
+            <textarea class="wj-textarea" id="wj-gs-desc" style="min-height:220px; font-size:14.5px; line-height:1.7">${esc(state.gsDesc)}</textarea>
+          </div>
+          <div class="wj-field">
+            <label class="wj-label">포함되는 활동 예시 (선택 — AI가 기록을 분류할 때 최우선으로 참고해요)</label>
+            <p class="wj-card-note" style="margin-top:-2px">등급 기준과는 별개로, "이런 활동이 이 목표에 해당한다/안 한다"는 경계를 직접 정의해두세요. 다른 목표와 헷갈리기 쉬운 용어일수록 효과가 커요.</p>
+            <textarea class="wj-textarea" id="wj-gs-scope" style="min-height:120px; font-size:14px; line-height:1.6">${esc(state.gsScopeNotes)}</textarea>
+          </div>
+          <div class="wj-row2 wj-field">
+            <div>
+              <label class="wj-label">기간 시작</label>
+              <input type="date" class="wj-input" id="wj-gs-start" value="${esc(state.gsPeriodStart)}" />
+            </div>
+            <div>
+              <label class="wj-label">기간 종료</label>
+              <input type="date" class="wj-input" id="wj-gs-end" value="${esc(state.gsPeriodEnd)}" />
+            </div>
+            <div>
+              <label class="wj-label">가중치 (%)</label>
+              <input type="number" class="wj-input" id="wj-gs-weight" value="${esc(state.gsWeight)}" placeholder="20" />
+            </div>
+          </div>
+          <button class="wj-btn" id="wj-gs-save">${editingNew ? '새 목표로 저장' : '이 목표 내용 저장'}</button>
+        </div>
+      </div>`;
+    }
+
     container.insertAdjacentHTML('beforeend', html);
 
-    const gsSelect = document.getElementById('wj-gs-select');
-    gsSelect.addEventListener('change', (e) => {
-      const g = e.target.value;
-      state.gsGoalSel = g;
-      const d = state.goalDetails[g] || {};
-      state.gsDesc = d.description || '';
-      state.gsScopeNotes = d.scopeNotes || '';
-      state.gsPeriodStart = d.periodStart || '';
-      state.gsPeriodEnd = d.periodEnd || '';
-      state.gsWeight = d.weight || '';
+    document.getElementById('wj-gs-open-new').addEventListener('click', () => {
+      state.gsGoalSel = ''; state.gsDesc = ''; state.gsScopeNotes = '';
+      state.gsPeriodStart = ''; state.gsPeriodEnd = ''; state.gsWeight = '';
+      state.gsModalOpen = true;
       render();
     });
+    document.querySelectorAll('[data-gs-open-edit]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const g = btn.dataset.gsOpenEdit;
+        const d = state.goalDetails[g] || {};
+        state.gsGoalSel = g;
+        state.gsDesc = d.description || '';
+        state.gsScopeNotes = d.scopeNotes || '';
+        state.gsPeriodStart = d.periodStart || '';
+        state.gsPeriodEnd = d.periodEnd || '';
+        state.gsWeight = d.weight || '';
+        state.gsModalOpen = true;
+        render();
+      });
+    });
+    document.querySelectorAll('[data-gs-ask-delete]').forEach(btn => {
+      btn.addEventListener('click', () => { state.gsConfirmDelete = btn.dataset.gsAskDelete; render(); });
+    });
+    document.querySelectorAll('[data-gs-cancel-delete]').forEach(btn => {
+      btn.addEventListener('click', () => { state.gsConfirmDelete = null; render(); });
+    });
+    document.querySelectorAll('[data-gs-confirm-delete]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const g = btn.dataset.gsConfirmDelete;
+        state.goals = state.goals.filter(x => x !== g);
+        delete state.goalDetails[g];
+        state.entries.forEach(e => { if (e.relatedGoals) e.relatedGoals = e.relatedGoals.filter(rg => rg !== g); });
+        if (state.viewGoalSel === g) state.viewGoalSel = '';
+        if (state.gsGoalSel === g) state.gsGoalSel = '';
+        state.gsConfirmDelete = null;
+        saveData(); showToast('목표가 삭제되었습니다.'); render();
+      });
+    });
+    const copyAllBtn = document.getElementById('wj-gs-copy-all');
+    if (copyAllBtn) {
+      copyAllBtn.addEventListener('click', () => {
+        const full = state.goals.map((g, i) => {
+          const d = state.goalDetails[g] || {};
+          return `${i+1}. ${g}\n[달성방안/목표수준]\n${d.description || '(미작성)'}\n[기간] ${d.periodStart || '?'} ~ ${d.periodEnd || '?'}\n[가중치] ${d.weight || 0}%`;
+        }).join('\n\n');
+        copyText(full, '전체 목표가 복사되었습니다. 목표입력 화면에 하나씩 옮겨주세요.');
+      });
+    }
+
+    if (!state.gsModalOpen) return;
+
+    const editingNew = !state.gsGoalSel;
     document.getElementById('wj-gs-desc').addEventListener('input', (e) => { state.gsDesc = e.target.value; });
     document.getElementById('wj-gs-scope').addEventListener('input', (e) => { state.gsScopeNotes = e.target.value; });
     document.getElementById('wj-gs-start').addEventListener('change', (e) => { state.gsPeriodStart = e.target.value; });
@@ -1663,21 +1920,19 @@ reply 필드:
         description: state.gsDesc, scopeNotes: state.gsScopeNotes, periodStart: state.gsPeriodStart,
         periodEnd: state.gsPeriodEnd, weight: state.gsWeight
       };
-      state.gsGoalSel = goalName;
+      state.gsModalOpen = false;
       saveData();
       showToast('목표가 저장되었습니다.');
       render();
     });
-    const copyAllBtn = document.getElementById('wj-gs-copy-all');
-    if (copyAllBtn) {
-      copyAllBtn.addEventListener('click', () => {
-        const full = state.goals.map((g, i) => {
-          const d = state.goalDetails[g] || {};
-          return `${i+1}. ${g}\n[달성방안/목표수준]\n${d.description || '(미작성)'}\n[기간] ${d.periodStart || '?'} ~ ${d.periodEnd || '?'}\n[가중치] ${d.weight || 0}%`;
-        }).join('\n\n');
-        copyText(full, '전체 목표가 복사되었습니다. 목표입력 화면에 하나씩 옮겨주세요.');
-      });
-    }
+    const modalOverlay = document.getElementById('wj-gs-modal-overlay');
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) { state.gsModalOpen = false; render(); }
+    });
+    document.getElementById('wj-gs-modal-close').addEventListener('click', () => {
+      state.gsModalOpen = false;
+      render();
+    });
   }
 
   async function generateQuarterSummary(selYear, selQ, entries) {
@@ -1768,49 +2023,220 @@ ${notesText}
     render();
   }
 
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function extractCompanyProfileFromFiles(files) {
+    state.profileFileLoading = true; state.profileFileError = ''; renderManageTab();
+    try {
+      const contentBlocks = [];
+      for (const file of files) {
+        const base64 = await fileToBase64(file);
+        const mediaType = file.type || 'image/png';
+        if (mediaType === 'application/pdf') {
+          contentBlocks.push({ type: 'document', source: { type: 'base64', media_type: mediaType, data: base64 } });
+        } else {
+          contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } });
+        }
+      }
+      const existingNote = state.companyProfile
+        ? `기존에 정리해 둔 내용은 다음과 같습니다:\n${state.companyProfile}\n\n이 내용은 최대한 유지하면서, 아래 새로 첨부된 자료의 내용을 통합해서 하나의 업데이트된 버전으로 다시 정리해주세요. 이번 자료에 없는 기존 내용도 지우지 말고 남겨두세요.`
+        : '';
+      contentBlocks.push({
+        type: 'text',
+        text: `첨부된 자료는 회사의 비전/핵심가치/조직문화에 관한 이미지 또는 문서입니다. ${existingNote}
+
+이 내용을 바탕으로, 나중에 리더십 진단 AI가 참고할 수 있도록 비전, 핵심가치, 조직문화 지향점, 관련 설명, 슬로건 등을 항목별로 간결하게 정리해주세요.
+
+규칙:
+- 자료에 없는 내용은 지어내지 마세요.
+- 마크다운 기호(#, ** 등)는 쓰지 말고, 일반 텍스트에 [소제목] 형태 정도만 써서 정리하세요.
+- 결과만 텍스트로 답하세요. 다른 설명이나 인사말은 포함하지 마세요.`
+      });
+
+      const response = await fetch("/api/ai/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: contentBlocks, max_tokens: 1500 })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'AI 요청 실패');
+      const text = (data.text || '').trim();
+      if (!text) throw new Error('빈 응답');
+      state.companyProfile = text;
+      showToast('자료 내용을 정리했어요. 확인 후 "저장" 버튼을 눌러주세요.');
+    } catch (e) {
+      state.profileFileError = `자료 정리에 실패했습니다 (${e.message || e}). 다시 시도해주세요.`;
+    }
+    state.profileFileLoading = false;
+    renderManageTab();
+  }
+
+  function scoreToBand(score) {
+    if (!score || score <= 0) return '';
+    if (score <= 2) return '1~2점';
+    if (score <= 5) return '3~5점';
+    return '6~7점';
+  }
+
+  function buildLeadershipItemsPrompt(targetLabel, notesText, voiceMode) {
+    const itemsContext = state.evalItems.map(name => {
+      const desc = state.evalItemDetails[name] || '(세부 기준 없음)';
+      return `- ${name}\n${desc}`;
+    }).join('\n\n');
+    const voiceInstruction = voiceMode === 'self'
+      ? `강점과 보완점은 본인이 직장 상사에게 제출하는 "본인평가" 문체로 작성하세요. 1인칭("저는", "~하고 있습니다", "~했습니다")을 사용하고, 성과는 자신감 있게 밝히되 겸손한 어조를 유지하세요. 보완점은 스스로 개선 의지를 드러내는 방식으로 서술하세요 (예: "~부분은 앞으로 ~하도록 노력하겠습니다").`
+      : `강점과 보완점은 동료를 평가하는 제3자 시점의 정중하고 사무적인 HR 평가 문체로 작성하세요 (예: "~하는 모습을 보였습니다", "~에 강점이 있습니다").`;
+    return `당신은 회사 리더십 진단을 준비하는 걸 돕는 도우미입니다. 아래는 '${targetLabel}'에 대해 평소 기록해 둔 관찰 메모와, 회사의 리더십 진단 평가항목(각 항목의 판단 기준 포함)입니다.
+${state.companyProfile ? `\n[회사 비전 / 조직문화 - "비전 및 목적 제시", "행동변화 독려 및 비전 정렬" 항목 판단 시 참고하세요]\n${state.companyProfile}\n` : ''}
+[평가항목 및 기준]
+${itemsContext}
+
+[관찰 메모]
+${notesText || '(기록 없음)'}
+
+작업 지침:
+1. 각 항목에 대해, 위 메모에 그 항목을 판단할 만한 실제 근거가 있는지 확인하세요.
+2. 근거가 있으면: 메모 내용을 위 척도 기준(1~2점/3~5점/6~7점 구간의 설명)과 비교해서, 가장 잘 맞는 구간을 고른 다음 그 구간 안에서 정확히 하나의 정수 점수(1~7 중 하나)를 정하세요. "5~7점"처럼 구간을 걸치거나 범위로 답하지 말고, 반드시 정수 하나만 고르세요. 그리고 그 판단의 근거가 된 내용을 1문장으로 요약하세요.
+3. 근거가 없으면: hasEvidence를 false로 하고 score는 0, rationale은 빈 문자열로 두세요. 절대 추측해서 점수를 만들지 마세요.
+4. 마지막으로, 근거가 있는 항목들만 종합해서 전체적인 강점과 보완점을 각각 3~5문장으로 작성하세요. 전반적으로 근거가 부족하면 그 사실도 솔직히 언급하세요. ${voiceInstruction}
+5. 사람 이름은 메모에 적힌 표기(예: 구성원1, 구성원2 등)를 그대로 사용하세요. 바꾸지 마세요.
+
+반드시 아래 JSON 형식으로만 응답하세요. items 배열은 위 평가항목 전부를 같은 순서로, 같은 개수만큼 포함해야 합니다. score는 항상 0~7 사이의 정수여야 합니다. 다른 설명이나 마크다운은 포함하지 마세요.
+{
+  "items": [
+    {"name": "항목명", "hasEvidence": true, "score": 6, "rationale": "근거 요약 (없으면 빈 문자열)"}
+  ],
+  "strengths": "전체 강점 요약",
+  "improvements": "전체 보완점 요약"
+}`;
+  }
+
   async function generateAIComments(sel, entries) {
     state.aiLoading = true; state.aiError = ''; render();
     try {
       const { forward, reverse } = buildAnonymizationMap();
       const anonSel = forward[sel] || sel;
       const notesText = entries.map(e => `- ${fmtEntryDate(e)}${e.evalItem ? ` [${e.evalItem}]` : ''}: ${anonymizeText(e.content, forward)}`).join('\n');
-      const prompt = `다음은 '${anonSel}'님에 대해 평소 기록해 둔 관찰 메모입니다. 이 메모 내용만을 근거로 삼아, 회사 리더십 진단 시스템에 입력할 '강점'과 '보완점' 코멘트를 각각 3~5문장 분량으로 작성해주세요.
-
-규칙:
-- 메모에 없는 내용은 추측해서 만들지 마세요.
-- 정중하고 사무적인 HR 평가 문체로 작성하세요.
-- 사람 이름은 메모에 적힌 표기(예: 구성원1, 구성원2 등)를 그대로 사용하세요. 바꾸지 마세요.
-- 반드시 아래 JSON 형식으로만 응답하세요. 다른 설명, 마크다운 코드블록 표시는 포함하지 마세요.
-{"strengths": "강점 내용", "improvements": "보완점 내용"}
-
-메모 목록:
-${notesText}`;
+      const prompt = buildLeadershipItemsPrompt(`동료 '${anonSel}'`, notesText, 'other');
 
       const response = await fetch("/api/ai/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, max_tokens: 1000 })
+        body: JSON.stringify({ prompt, max_tokens: 3500 })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'AI 요청 실패');
       const text = data.text || '';
       const clean = text.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(clean);
+      state.aiItems = (parsed.items || []).map(it => {
+        const score = parseInt(it.score, 10) || 0;
+        return {
+          name: it.name, hasEvidence: !!it.hasEvidence, score,
+          levelHint: scoreToBand(score), rationale: deanonymizeText(it.rationale || '', reverse)
+        };
+      });
       state.aiStrengths = deanonymizeText(parsed.strengths || '', reverse);
       state.aiImprovements = deanonymizeText(parsed.improvements || '', reverse);
       state.aiForPerson = sel;
     } catch (e) {
-      state.aiError = '코멘트 생성에 실패했습니다. 다시 시도해주세요.';
+      state.aiError = `초안 생성에 실패했습니다 (${e.message || e}). 다시 시도해주세요.`;
     }
     state.aiLoading = false;
     render();
   }
 
+  async function generateSelfLeadershipDraft() {
+    state.selfDiagLoading = true; state.selfDiagError = ''; render();
+    try {
+      const { forward, reverse } = buildAnonymizationMap();
+      const entries = state.entries.slice().sort((a,b) => a.dateStart.localeCompare(b.dateStart));
+      const notesText = entries.map(e => `- ${fmtEntryDate(e)}${e.evalItem ? ` [${e.evalItem}]` : ''} (${e.type === 'person' ? '협업 대상: ' + (forward[e.tag] || e.tag) : '업무: ' + e.tag}): ${anonymizeText(e.content, forward)}`).join('\n');
+      const prompt = buildLeadershipItemsPrompt('나 자신(본인)', notesText, 'self');
+
+      const response = await fetch("/api/ai/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, max_tokens: 3500 })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'AI 요청 실패');
+      const text = data.text || '';
+      const clean = text.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(clean);
+      state.selfDiagItems = (parsed.items || []).map(it => {
+        const score = parseInt(it.score, 10) || 0;
+        return {
+          name: it.name, hasEvidence: !!it.hasEvidence, score,
+          levelHint: scoreToBand(score), rationale: deanonymizeText(it.rationale || '', reverse)
+        };
+      });
+      state.selfDiagStrengths = deanonymizeText(parsed.strengths || '', reverse);
+      state.selfDiagImprovements = deanonymizeText(parsed.improvements || '', reverse);
+      state.selfDiagGenerated = true;
+    } catch (e) {
+      state.selfDiagError = `초안 생성에 실패했습니다 (${e.message || e}). 다시 시도해주세요.`;
+    }
+    state.selfDiagLoading = false;
+    render();
+  }
+
+  function renderEvalItemsList(items) {
+    if (!items || items.length === 0) return '';
+    return items.map(it => `
+      <div class="wj-eval-item-row">
+        <div class="wj-eval-item-name">${esc(it.name)}${it.hasEvidence ? `<span class="wj-eval-item-level">${it.score}점</span>` : ''}</div>
+        ${it.hasEvidence
+          ? `<div class="wj-eval-item-rationale">${esc(it.rationale)}</div>`
+          : `<div class="wj-eval-item-noev">판단할 근거 있는 기록 없음</div>`}
+      </div>
+    `).join('');
+  }
+
+  function evalItemsToText(items) {
+    return items.map((it, i) => `${i+1}. ${it.name}: ${it.hasEvidence ? `${it.score}점 — ${it.rationale}` : '판단할 근거 있는 기록 없음'}`).join('\n');
+  }
+
   function renderPersonTab() {
-    let html = `<div class="wj-card">`;
+    let html = `<div class="wj-card">
+      <span class="wj-field-label-hint" style="background:var(--gold)">리더십 진단 &gt; 본인평가 초안</span>
+      <h3>본인 리더십 진단 초안</h3>
+      <p class="wj-card-note">지금까지 남긴 모든 업무/협업 기록을 근거로, 회사 리더십 진단 항목별로 초안을 만들어드려요. 근거 있는 기록이 있는 항목만 수준을 제안하고, 없는 항목은 솔직하게 "근거 없음"으로 남겨요.</p>
+      <p class="wj-card-note">🔒 기록 속 동료 이름은 AI에게 보내기 전에 익명 표기로 바꾸고, 답변을 받은 뒤 다시 이름으로 복원해요.</p>
+      ${state.entries.length === 0 ? `<div class="wj-empty">아직 남긴 기록이 없습니다.</div>` : `
+        <button class="wj-btn secondary" id="wj-gen-self-diag" ${state.selfDiagLoading ? 'disabled' : ''}>
+          ${state.selfDiagLoading ? '생성 중...' : (state.selfDiagGenerated ? '다시 생성하기' : '본인 진단 초안 생성')}
+        </button>
+        ${state.selfDiagLoading ? `<div class="wj-spinner-text" style="margin-top:10px"><span class="wj-spinner"></span> 전체 기록을 항목별로 대조하고 있어요...</div>` : ''}
+        ${state.selfDiagError ? `<div class="wj-error-text">${esc(state.selfDiagError)}</div>` : ''}
+        ${state.selfDiagGenerated ? `
+          <div style="margin-top:16px">
+            <div class="wj-comment-block-header"><span>항목별 결과</span><button class="wj-btn ghost small" id="wj-copy-self-items">복사</button></div>
+            ${renderEvalItemsList(state.selfDiagItems)}
+          </div>
+          <div class="wj-comment-block" style="margin-top:16px">
+            <div class="wj-comment-block-header"><span>강점</span><button class="wj-btn ghost small" id="wj-copy-self-strengths">복사</button></div>
+            <textarea class="wj-textarea" id="wj-self-strengths" style="min-height:100px">${esc(state.selfDiagStrengths)}</textarea>
+          </div>
+          <div class="wj-comment-block">
+            <div class="wj-comment-block-header"><span>보완점</span><button class="wj-btn ghost small" id="wj-copy-self-improvements">복사</button></div>
+            <textarea class="wj-textarea" id="wj-self-improvements" style="min-height:100px">${esc(state.selfDiagImprovements)}</textarea>
+          </div>
+        ` : ''}
+      `}
+    </div>`;
+
     if (state.people.length === 0) {
-      html += `<div class="wj-empty">아직 등록된 구성원이 없습니다. '관리' 탭에서 부서와 구성원을 먼저 추가해보세요.</div></div>`;
+      html += `<div class="wj-card"><div class="wj-empty">아직 등록된 구성원이 없습니다. '기본 설정/도구 &gt; 인원 관리'에서 부서와 구성원을 먼저 추가해보세요.</div></div>`;
       document.getElementById('wj-view-body').innerHTML = html;
+      attachSelfDiagHandlers();
       return;
     }
     const deptFilter = state.personDeptFilter || '';
@@ -1841,6 +2267,7 @@ ${notesText}`;
     if (!sel) {
       html += `<div class="wj-card"><div class="wj-empty">이 부서에 등록된 구성원이 없습니다.</div></div>`;
       document.getElementById('wj-view-body').innerHTML = html;
+      attachSelfDiagHandlers();
       const deptSelectEmpty = document.getElementById('wj-dept-filter');
       if (deptSelectEmpty) deptSelectEmpty.addEventListener('change', (e) => { state.personDeptFilter = e.target.value; render(); });
       return;
@@ -1850,26 +2277,28 @@ ${notesText}`;
     const selDept = state.personDept[sel] || '';
 
     html += `<div class="wj-card">
-      <span class="wj-field-label-hint" style="background:var(--gold)">리더십 진단 &gt; 강점/보완점 코멘트 자동 생성</span>
+      <span class="wj-field-label-hint" style="background:var(--gold)">리더십 진단 &gt; 구성원 평가 초안</span>
       <h3>${esc(sel)}${selDept ? ` <span class="wj-count-badge">${esc(selDept)}</span>` : ''}</h3>
-      <p class="wj-card-note">이미지 속 "Comment" 표(강점/보완점 서술란)에 맞춰, 이 구성원에 대해 쌓인 기록을 AI가 찾아 코멘트 초안을 작성합니다. 붙여넣기 전에 꼭 내용을 확인·수정해주세요.</p>
+      <p class="wj-card-note">회사 리더십 진단 항목별로, 이 구성원에 대해 쌓인 기록을 AI가 찾아 초안을 작성합니다. 붙여넣기 전에 꼭 내용을 확인·수정해주세요.</p>
       <p class="wj-card-note">🔒 실제 이름은 AI에게 보내기 전에 익명 표기로 바꾸고, 답변을 받은 뒤 다시 이름으로 복원해요.</p>
       ${entries.length === 0 ? `<div class="wj-empty">이 구성원에 대한 기록이 아직 없습니다.</div>` : `
         <button class="wj-btn secondary" id="wj-gen-ai" ${state.aiLoading ? 'disabled' : ''}>
-          ${state.aiLoading ? '생성 중...' : '강점/보완점 코멘트 초안 생성'}
+          ${state.aiLoading ? '생성 중...' : '항목별 진단 초안 생성'}
         </button>
-        ${state.aiLoading ? `<div class="wj-spinner-text" style="margin-top:10px"><span class="wj-spinner"></span> 기록을 바탕으로 코멘트를 작성하고 있어요...</div>` : ''}
+        ${state.aiLoading ? `<div class="wj-spinner-text" style="margin-top:10px"><span class="wj-spinner"></span> 기록을 항목별로 대조하고 있어요...</div>` : ''}
         ${state.aiError ? `<div class="wj-error-text">${esc(state.aiError)}</div>` : ''}
-        ${(state.aiForPerson === sel && (state.aiStrengths || state.aiImprovements)) ? `
+        ${(state.aiForPerson === sel && state.aiItems.length > 0) ? `
           <div style="margin-top:16px">
-            <div class="wj-comment-block">
-              <div class="wj-comment-block-header"><span>강점</span><button class="wj-btn ghost small" data-copy-field="strengths">복사</button></div>
-              <textarea class="wj-textarea" id="wj-ai-strengths" style="min-height:110px">${esc(state.aiStrengths)}</textarea>
-            </div>
-            <div class="wj-comment-block">
-              <div class="wj-comment-block-header"><span>보완점</span><button class="wj-btn ghost small" data-copy-field="improvements">복사</button></div>
-              <textarea class="wj-textarea" id="wj-ai-improvements" style="min-height:110px">${esc(state.aiImprovements)}</textarea>
-            </div>
+            <div class="wj-comment-block-header"><span>항목별 결과</span><button class="wj-btn ghost small" data-copy-field="items">복사</button></div>
+            ${renderEvalItemsList(state.aiItems)}
+          </div>
+          <div class="wj-comment-block" style="margin-top:16px">
+            <div class="wj-comment-block-header"><span>강점</span><button class="wj-btn ghost small" data-copy-field="strengths">복사</button></div>
+            <textarea class="wj-textarea" id="wj-ai-strengths" style="min-height:110px">${esc(state.aiStrengths)}</textarea>
+          </div>
+          <div class="wj-comment-block">
+            <div class="wj-comment-block-header"><span>보완점</span><button class="wj-btn ghost small" data-copy-field="improvements">복사</button></div>
+            <textarea class="wj-textarea" id="wj-ai-improvements" style="min-height:110px">${esc(state.aiImprovements)}</textarea>
           </div>
         ` : ''}
       `}
@@ -1882,6 +2311,7 @@ ${notesText}`;
     </div>`;
 
     document.getElementById('wj-view-body').innerHTML = html;
+    attachSelfDiagHandlers();
     const deptSelect = document.getElementById('wj-dept-filter');
     if (deptSelect) deptSelect.addEventListener('change', (e) => {
       state.personDeptFilter = e.target.value;
@@ -1891,7 +2321,7 @@ ${notesText}`;
     const pSelect = document.getElementById('wj-person-select');
     if (pSelect) pSelect.addEventListener('change', (e) => {
       state.viewPersonSel = e.target.value;
-      state.aiStrengths = ''; state.aiImprovements = ''; state.aiError = ''; state.aiForPerson = '';
+      state.aiStrengths = ''; state.aiImprovements = ''; state.aiError = ''; state.aiForPerson = ''; state.aiItems = [];
       render();
     });
     const genBtn = document.getElementById('wj-gen-ai');
@@ -1899,11 +2329,27 @@ ${notesText}`;
     document.querySelectorAll('[data-copy-field]').forEach(btn => {
       btn.addEventListener('click', () => {
         const field = btn.dataset.copyField;
+        if (field === 'items') { copyText(evalItemsToText(state.aiItems), '항목별 결과가 복사되었습니다.'); return; }
         const textEl = document.getElementById(field === 'strengths' ? 'wj-ai-strengths' : 'wj-ai-improvements');
         copyText(textEl.value, `${field === 'strengths' ? '강점' : '보완점'} 코멘트가 복사되었습니다.`);
       });
     });
     attachDeleteHandlers();
+  }
+
+  function attachSelfDiagHandlers() {
+    const genBtn = document.getElementById('wj-gen-self-diag');
+    if (genBtn) genBtn.addEventListener('click', () => generateSelfLeadershipDraft());
+    const copyItemsBtn = document.getElementById('wj-copy-self-items');
+    if (copyItemsBtn) copyItemsBtn.addEventListener('click', () => copyText(evalItemsToText(state.selfDiagItems), '항목별 결과가 복사되었습니다.'));
+    const copyStrengthsBtn = document.getElementById('wj-copy-self-strengths');
+    if (copyStrengthsBtn) copyStrengthsBtn.addEventListener('click', () => {
+      copyText(document.getElementById('wj-self-strengths').value, '강점 코멘트가 복사되었습니다.');
+    });
+    const copyImprovementsBtn = document.getElementById('wj-copy-self-improvements');
+    if (copyImprovementsBtn) copyImprovementsBtn.addEventListener('click', () => {
+      copyText(document.getElementById('wj-self-improvements').value, '보완점 코멘트가 복사되었습니다.');
+    });
   }
 
   function downloadTextFile(filename, content) {
@@ -1922,7 +2368,7 @@ ${notesText}`;
   function exportData() {
     const payload = {
       exportedAt: new Date().toISOString(),
-      people: state.people, goals: state.goals, evalItems: state.evalItems,
+      people: state.people, goals: state.goals,
       departments: state.departments, personDept: state.personDept,
       entries: state.entries, goalDetails: state.goalDetails
     };
@@ -1946,7 +2392,7 @@ ${notesText}`;
         const parsed = JSON.parse(e.target.result);
         if (!parsed || typeof parsed !== 'object') throw new Error('invalid');
         state.importPendingData = {
-          people: parsed.people || [], goals: parsed.goals || [], evalItems: parsed.evalItems || [],
+          people: parsed.people || [], goals: parsed.goals || [],
           departments: parsed.departments || [], personDept: parsed.personDept || {},
           entries: parsed.entries || [], goalDetails: parsed.goalDetails || {}
         };
@@ -1970,7 +2416,6 @@ ${notesText}`;
     if (!d) return;
     d.people.forEach(p => { if (!state.people.includes(p)) state.people.push(p); });
     d.goals.forEach(g => { if (!state.goals.includes(g)) state.goals.push(g); });
-    d.evalItems.forEach(it => { if (!state.evalItems.includes(it)) state.evalItems.push(it); });
     d.departments.forEach(dep => { if (!state.departments.includes(dep)) state.departments.push(dep); });
     Object.assign(state.personDept, d.personDept);
     Object.assign(state.goalDetails, d.goalDetails);
@@ -1987,9 +2432,25 @@ ${notesText}`;
   }
 
   function renderManageTab() {
-    let html = `<div class="wj-card">
+    document.getElementById('wj-content').innerHTML = `<div id="wj-manage-body"></div>`;
+    if (state.manageSubTab === 'people') renderManagePeopleTab();
+    else if (state.manageSubTab === 'data') renderManageDataTab();
+    else renderGoalSettingSubTab();
+  }
+
+  function renderAdminTab() {
+    document.getElementById('wj-content').innerHTML = `<div id="wj-manage-body"></div>`;
+    let sub = state.adminSubTab;
+    if (sub === 'permissions' && state.myRole !== 'primary') sub = 'vision';
+    if (sub === 'evalitems') renderManageEvalTab();
+    else if (sub === 'permissions') renderAdminPermissionsTab();
+    else renderManageVisionTab();
+  }
+
+  function renderManageDataTab() {
+    const html = `<div class="wj-card">
       <h3>데이터 내보내기 / 가져오기</h3>
-      <p class="wj-card-note">다른 기기에서도 같은 데이터를 쓰고 싶다면, 여기서 파일로 내보낸 뒤 다른 기기에서 이 앱을 열어 가져오세요. 가져오기는 기존 데이터에 병합되며, 지우지 않아요.</p>
+      <p class="wj-card-note">다른 기기에서도 같은 데이터를 쓰고 싶다면, 여기서 파일로 내보낸 뒤 다른 기기에서 이 앱을 열어 가져오세요. 가져오기는 기존 데이터에 병합되며, 지우지 않아요. 구성원/부서/업무·목표/전체 기록이 포함돼요. 평가요소와 회사 비전/조직문화는 "관리자 설정"에서 별도로 관리되며, 여기 내보내기/가져오기에는 포함되지 않아요.</p>
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px">
         <button class="wj-btn" id="wj-export-btn">데이터 파일로 내보내기</button>
         <button class="wj-btn ghost" id="wj-import-trigger">파일에서 가져오기</button>
@@ -1998,15 +2459,140 @@ ${notesText}`;
       ${state.importError ? `<div class="wj-error-text">${esc(state.importError)}</div>` : ''}
       ${state.importPreview ? `
         <div class="wj-preview">가져올 데이터: 구성원 ${state.importPreview.people}명 · 부서 ${state.importPreview.departments}개 · 업무/목표 ${state.importPreview.goals}개 · 기록 ${state.importPreview.entries}건
-(이미 있는 항목은 중복 추가되지 않고, 기록은 기존 것과 겹치지 않는 것만 더해집니다)</div>
+(이미 있는 항목은 중복 추가되지 않고, 기록은 기존 것과 겹치지 않는 것만 더해집니다. 평가요소·회사 비전은 관리자 설정에 속해 있어 여기서는 다루지 않아요.)</div>
         <div style="display:flex; gap:8px">
           <button class="wj-btn secondary" id="wj-import-confirm">병합해서 가져오기</button>
           <button class="wj-btn ghost" id="wj-import-cancel">취소</button>
         </div>
       ` : ''}
+    </div>`;
+
+    document.getElementById('wj-manage-body').innerHTML = html;
+
+    document.getElementById('wj-export-btn').addEventListener('click', exportData);
+    document.getElementById('wj-import-trigger').addEventListener('click', () => {
+      document.getElementById('wj-import-input').click();
+    });
+    document.getElementById('wj-import-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) handleImportFile(file);
+      e.target.value = '';
+    });
+    const importConfirmBtn = document.getElementById('wj-import-confirm');
+    if (importConfirmBtn) importConfirmBtn.addEventListener('click', confirmImportMerge);
+    const importCancelBtn = document.getElementById('wj-import-cancel');
+    if (importCancelBtn) importCancelBtn.addEventListener('click', () => {
+      state.importPreview = null; state.importPendingData = null; render();
+    });
+  }
+
+  function renderAdminPermissionsTab() {
+    const html = `<div class="wj-card">
+      <h3>권한 관리</h3>
+      <p class="wj-card-note">이 화면은 관리자(정)만 볼 수 있어요. 관리자(정)과 관리자(부)는 "회사 비전/조직문화", "리더십 평가요소 관리"를 수정할 수 있어요.</p>
+      <div class="wj-manage-row"><span>현재 관리자(정)</span><span class="wj-count-badge">${esc(state.adminPrimaryLabel || '본인')}</span></div>
     </div>
 
     <div class="wj-card">
+      <h3>관리자(정) 권한 양도</h3>
+      <p class="wj-card-note">양도하면 이 화면을 보고 있는 본인은 즉시 일반 권한으로 바뀌고, "관리자 설정" 메뉴 자체가 더 이상 보이지 않게 돼요. 신중하게 진행해주세요.</p>
+      <div class="wj-select-row">
+        <select class="wj-select" id="wj-transfer-primary-select">
+          <option value="">양도할 사람 선택</option>
+          ${state.people.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('')}
+        </select>
+        <button class="wj-btn danger-ghost" id="wj-transfer-primary-btn">양도하기</button>
+      </div>
+      ${state.people.length === 0 ? `<p class="wj-card-note" style="margin-top:6px">양도할 대상이 없어요. '기본 설정/도구 &gt; 인원 관리'에서 구성원을 먼저 등록해주세요.</p>` : ''}
+      ${state.confirmTransferPrimary ? `<div style="margin-top:10px">
+        <div class="wj-error-text" style="margin-bottom:8px">정말 "${esc(state.confirmTransferPrimary)}"에게 관리자(정) 권한을 넘기시겠어요? 이후 본인은 관리자 설정 메뉴에 접근할 수 없게 돼요.</div>
+        <div style="display:flex; gap:8px">
+          <button class="wj-btn small" style="background:var(--danger)" id="wj-confirm-transfer-btn">양도 확정</button>
+          <button class="wj-btn ghost small" id="wj-cancel-transfer-btn">취소</button>
+        </div>
+      </div>` : ''}
+    </div>
+
+    <div class="wj-card">
+      <h3>관리자(부) 지정</h3>
+      <p class="wj-card-note">체크한 구성원은 관리자(부) 권한을 가져요. "회사 비전/조직문화", "리더십 평가요소 관리"는 수정할 수 있지만, 이 "권한 관리" 화면은 볼 수 없어요.</p>
+      ${state.people.length === 0 ? `<div class="wj-empty">등록된 구성원이 없습니다. '기본 설정/도구 &gt; 인원 관리'에서 먼저 추가해보세요.</div>` :
+        state.people.map(p => `<div class="wj-manage-row">
+          <span>${esc(p)}</span>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer">
+            <input type="checkbox" data-secondary-toggle="${esc(p)}" ${state.adminSecondaryNames.includes(p) ? 'checked' : ''} /> 관리자(부)
+          </label>
+        </div>`).join('')
+      }
+    </div>
+
+    <div class="wj-card">
+      <p class="wj-card-note">🔒 참고: 이 앱은 혼자 쓰는 개인용 도구라, 지금은 실제로 다른 사람이 로그인해서 접근하는 구조가 아니에요. 이 권한 설정은 나중에 여러 명이 함께 쓰는 서버 버전으로 옮길 때 그대로 반영될 수 있도록 미리 준비해두는 용도예요. 지금은 "관리자(정) 권한 양도"를 누르면 본인 화면에서 관리자 설정 메뉴가 바로 사라지는 것까지만 확인할 수 있어요.</p>
+    </div>`;
+
+    document.getElementById('wj-manage-body').innerHTML = html;
+
+    document.getElementById('wj-transfer-primary-btn').addEventListener('click', () => {
+      const sel = document.getElementById('wj-transfer-primary-select').value;
+      if (!sel) { showToast('양도할 사람을 선택해주세요.'); return; }
+      state.confirmTransferPrimary = sel;
+      render();
+    });
+    const confirmBtn = document.getElementById('wj-confirm-transfer-btn');
+    if (confirmBtn) confirmBtn.addEventListener('click', () => {
+      state.adminPrimaryLabel = state.confirmTransferPrimary;
+      state.myRole = 'member';
+      state.confirmTransferPrimary = null;
+      state.tab = 'manage';
+      saveData();
+      showToast(`관리자(정) 권한을 ${esc(state.adminPrimaryLabel)}님에게 넘겼습니다.`);
+      render();
+    });
+    const cancelBtn = document.getElementById('wj-cancel-transfer-btn');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => { state.confirmTransferPrimary = null; render(); });
+    document.querySelectorAll('[data-secondary-toggle]').forEach(cb => {
+      cb.addEventListener('change', (e) => {
+        const name = cb.dataset.secondaryToggle;
+        if (e.target.checked) { if (!state.adminSecondaryNames.includes(name)) state.adminSecondaryNames.push(name); }
+        else { state.adminSecondaryNames = state.adminSecondaryNames.filter(n => n !== name); }
+        saveData(); render();
+      });
+    });
+  }
+
+  function renderManageVisionTab() {
+    const html = `<div class="wj-card">
+      <h3>회사 비전 / 조직문화</h3>
+      <p class="wj-card-note">회사의 비전, 핵심가치, 조직문화 지향점을 여기 적어두세요. 리더십 진단 초안(특히 "비전 및 목적 제시", "행동변화 독려 및 비전 정렬" 같은 항목)을 만들 때 AI가 이 내용을 참고해서 더 정확하게 판단해요. 회사 시스템에는 들어가지 않는, AI 참고 전용 내용이에요.</p>
+      <div class="wj-add-row" style="margin-top:0; margin-bottom:10px">
+        <button class="wj-btn ghost" id="wj-profile-file-trigger" ${state.profileFileLoading ? 'disabled' : ''}>📎 이미지/PDF에서 자동 정리</button>
+        <input type="file" id="wj-profile-file-input" accept="image/png,image/jpeg,image/webp,application/pdf" multiple style="display:none" />
+      </div>
+      ${state.profileFileLoading ? `<div class="wj-spinner-text" style="margin-bottom:10px"><span class="wj-spinner"></span> 자료 내용을 읽고 정리하고 있어요...</div>` : ''}
+      ${state.profileFileError ? `<div class="wj-error-text" style="margin-bottom:10px">${esc(state.profileFileError)}</div>` : ''}
+      <textarea class="wj-textarea" id="wj-company-profile" style="min-height:160px; font-size:13.5px; line-height:1.6" placeholder="예: 비전 - 국내 Top Tier 산업플랜트 Provider / 핵심가치 - 전문성, 사람중심, 혁신, 동반성장 ...">${esc(state.companyProfile)}</textarea>
+      <button class="wj-btn" id="wj-save-company-profile" style="margin-top:8px">저장</button>
+    </div>`;
+
+    document.getElementById('wj-manage-body').innerHTML = html;
+
+    document.getElementById('wj-save-company-profile').addEventListener('click', () => {
+      state.companyProfile = document.getElementById('wj-company-profile').value;
+      saveData();
+      showToast('회사 비전/조직문화가 저장되었습니다.');
+    });
+    document.getElementById('wj-profile-file-trigger').addEventListener('click', () => {
+      document.getElementById('wj-profile-file-input').click();
+    });
+    document.getElementById('wj-profile-file-input').addEventListener('change', (e) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length > 0) extractCompanyProfileFromFiles(files);
+      e.target.value = '';
+    });
+  }
+
+  function renderManagePeopleTab() {
+    const html = `<div class="wj-card">
       <h3>부서 관리</h3>
       <p class="wj-card-note">부서를 먼저 등록해두면, 구성원을 추가할 때 소속 부서를 지정할 수 있어요.</p>
       ${state.departments.length === 0 ? `<div class="wj-empty">등록된 부서가 없습니다.</div>` :
@@ -2070,80 +2656,9 @@ ${notesText}`;
         </select>
         <button class="wj-btn" id="wj-add-person">추가</button>
       </div>
-    </div>
-
-    <div class="wj-card">
-      <h3>업무/목표 관리 (MBO 목표명과 맞추면 좋아요)</h3>
-      ${state.goals.length === 0 ? `<div class="wj-empty">등록된 업무가 없습니다.</div>` :
-        state.goals.map(g => {
-          const cnt = state.entries.filter(e => e.type==='work' && e.tag===g).length;
-          if (state.editingGoal === g) {
-            return `<div class="wj-manage-row">
-              <input class="wj-input" id="wj-edit-goal-input" value="${esc(state.editingGoalValue)}" style="max-width:260px" />
-              <div style="display:flex; gap:6px">
-                <button class="wj-btn small" data-save-goal="${esc(g)}">저장</button>
-                <button class="wj-btn ghost small" data-cancel-goal="1">취소</button>
-              </div>
-            </div>`;
-          }
-          return `<div class="wj-manage-row"><span>${esc(g)} <span class="wj-count-badge">${cnt}건</span></span>
-            <div style="display:flex; gap:6px">
-              <button class="wj-btn ghost small" data-edit-goal="${esc(g)}">수정</button>
-              <button class="wj-btn danger-ghost" data-del-goal="${esc(g)}">삭제</button>
-            </div></div>`;
-        }).join('')
-      }
-      <div class="wj-add-row">
-        <input class="wj-input" id="wj-new-goal" placeholder="새 업무/목표 이름" />
-        <button class="wj-btn" id="wj-add-goal">추가</button>
-      </div>
-    </div>
-
-    <div class="wj-card">
-      <h3>평가요소 관리 (리더십 진단 항목 - 인사팀 변경 시 여기서 수정)</h3>
-      <p class="wj-card-note">예: 최적의 의사결정, 코칭 및 피드백 등. 기록 남길 때 어떤 항목과 관련 있는지 선택할 수 있게 됩니다.</p>
-      ${state.evalItems.length === 0 ? `<div class="wj-empty">등록된 평가요소가 없습니다.</div>` :
-        state.evalItems.map(it => {
-          const cnt = state.entries.filter(e => e.evalItem===it).length;
-          if (state.editingEvalItem === it) {
-            return `<div class="wj-manage-row">
-              <input class="wj-input" id="wj-edit-eval-input" value="${esc(state.editingEvalItemValue)}" style="max-width:260px" />
-              <div style="display:flex; gap:6px">
-                <button class="wj-btn small" data-save-eval="${esc(it)}">저장</button>
-                <button class="wj-btn ghost small" data-cancel-eval="1">취소</button>
-              </div>
-            </div>`;
-          }
-          return `<div class="wj-manage-row"><span>${esc(it)} <span class="wj-count-badge">${cnt}건</span></span>
-            <div style="display:flex; gap:6px">
-              <button class="wj-btn ghost small" data-edit-eval="${esc(it)}">수정</button>
-              <button class="wj-btn danger-ghost" data-del-eval="${esc(it)}">삭제</button>
-            </div></div>`;
-        }).join('')
-      }
-      <div class="wj-add-row">
-        <input class="wj-input" id="wj-new-eval" placeholder="새 평가요소 이름 (예: 코칭 및 피드백)" />
-        <button class="wj-btn" id="wj-add-eval">추가</button>
-      </div>
     </div>`;
 
-    document.getElementById('wj-content').innerHTML = html;
-
-    document.getElementById('wj-export-btn').addEventListener('click', exportData);
-    document.getElementById('wj-import-trigger').addEventListener('click', () => {
-      document.getElementById('wj-import-input').click();
-    });
-    document.getElementById('wj-import-input').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) handleImportFile(file);
-      e.target.value = '';
-    });
-    const importConfirmBtn = document.getElementById('wj-import-confirm');
-    if (importConfirmBtn) importConfirmBtn.addEventListener('click', confirmImportMerge);
-    const importCancelBtn = document.getElementById('wj-import-cancel');
-    if (importCancelBtn) importCancelBtn.addEventListener('click', () => {
-      state.importPreview = null; state.importPendingData = null; render();
-    });
+    document.getElementById('wj-manage-body').innerHTML = html;
 
     document.querySelectorAll('[data-edit-dept]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -2172,7 +2687,6 @@ ${notesText}`;
         saveData(); showToast('부서명이 수정되었습니다.'); render();
       });
     });
-
     document.querySelectorAll('[data-edit-person]').forEach(btn => {
       btn.addEventListener('click', () => {
         state.editingPerson = btn.dataset.editPerson;
@@ -2229,18 +2743,6 @@ ${notesText}`;
       if (dept) state.personDept[val] = dept;
       saveData(); render();
     });
-    document.getElementById('wj-add-goal').addEventListener('click', () => {
-      const val = document.getElementById('wj-new-goal').value.trim();
-      if (!val) return;
-      if (!state.goals.includes(val)) state.goals.push(val);
-      saveData(); render();
-    });
-    document.getElementById('wj-add-eval').addEventListener('click', () => {
-      const val = document.getElementById('wj-new-eval').value.trim();
-      if (!val) return;
-      if (!state.evalItems.includes(val)) state.evalItems.push(val);
-      saveData(); render();
-    });
     document.querySelectorAll('[data-del-person]').forEach(btn => {
       btn.addEventListener('click', () => {
         state.people = state.people.filter(p => p !== btn.dataset.delPerson);
@@ -2248,37 +2750,54 @@ ${notesText}`;
         saveData(); render();
       });
     });
-    document.querySelectorAll('[data-edit-goal]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.editingGoal = btn.dataset.editGoal;
-        state.editingGoalValue = btn.dataset.editGoal;
-        render();
-      });
-    });
-    document.querySelectorAll('[data-cancel-goal]').forEach(btn => {
-      btn.addEventListener('click', () => { state.editingGoal = null; render(); });
-    });
-    const editGoalInput = document.getElementById('wj-edit-goal-input');
-    if (editGoalInput) editGoalInput.addEventListener('input', (e) => { state.editingGoalValue = e.target.value; });
-    document.querySelectorAll('[data-save-goal]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const oldName = btn.dataset.saveGoal;
-        const newName = (state.editingGoalValue || '').trim();
-        if (!newName) { showToast('목표 이름을 입력해주세요.'); return; }
-        if (newName !== oldName && state.goals.includes(newName)) { showToast('이미 존재하는 목표명입니다.'); return; }
-        state.goals = state.goals.map(g => g === oldName ? newName : g);
-        if (state.goalDetails[oldName]) { state.goalDetails[newName] = state.goalDetails[oldName]; delete state.goalDetails[oldName]; }
-        state.entries.forEach(e => {
-          if (e.type === 'work' && e.tag === oldName) e.tag = newName;
-          if (e.relatedGoals) e.relatedGoals = e.relatedGoals.map(g => g === oldName ? newName : g);
-        });
-        if (state.viewGoalSel === oldName) state.viewGoalSel = newName;
-        if (state.gsGoalSel === oldName) state.gsGoalSel = newName;
-        state.editingGoal = null;
-        saveData(); showToast('목표명이 수정되었습니다.'); render();
-      });
-    });
+  }
 
+  function renderManageEvalTab() {
+    const html = `<div class="wj-card">
+      <h3>평가요소 관리 (리더십 진단 항목 - 인사팀 변경 시 여기서 수정)</h3>
+      <p class="wj-card-note">기본으로 실제 회사 리더십 진단 10개 항목이 들어가 있어요. 각 항목의 "설명"에는 직책자/비직책자 평가내용과 1~7점 척도 기준이 들어있고, AI가 항목별 초안을 만들 때 이 설명을 그대로 기준으로 사용해요.</p>
+      ${state.evalItems.length === 0 ? `<div class="wj-empty">등록된 평가요소가 없습니다.</div>` :
+        state.evalItems.map((it, idx) => {
+          const cnt = state.entries.filter(e => e.evalItem===it).length;
+          if (state.editingEvalItem === it) {
+            return `<div class="wj-manage-row">
+              <input class="wj-input" id="wj-edit-eval-input" value="${esc(state.editingEvalItemValue)}" style="max-width:260px" />
+              <div style="display:flex; gap:6px">
+                <button class="wj-btn small" data-save-eval="${esc(it)}">저장</button>
+                <button class="wj-btn ghost small" data-cancel-eval="1">취소</button>
+              </div>
+            </div>`;
+          }
+          const expanded = !!state.expandedEvalDetail[it];
+          return `<div>
+            <div class="wj-manage-row"><span>${esc(it)} <span class="wj-count-badge">${cnt}건</span></span>
+              <div style="display:flex; gap:6px">
+                <button class="wj-btn ghost small" data-toggle-eval-detail="${idx}">${expanded ? '설명 접기' : '설명 보기'}</button>
+                <button class="wj-btn ghost small" data-edit-eval="${esc(it)}">수정</button>
+                <button class="wj-btn danger-ghost" data-del-eval="${esc(it)}">삭제</button>
+              </div>
+            </div>
+            ${expanded ? `<div style="padding:0 0 10px">
+              <textarea class="wj-textarea" id="wj-eval-detail-${idx}" style="min-height:150px; font-size:12.5px; line-height:1.6">${esc(state.evalItemDetails[it] || '')}</textarea>
+              <button class="wj-btn small" style="margin-top:6px" data-save-eval-detail="${idx}">설명 저장</button>
+            </div>` : ''}
+          </div>`;
+        }).join('')
+      }
+      <div class="wj-add-row">
+        <input class="wj-input" id="wj-new-eval" placeholder="새 평가요소 이름 (예: 코칭 및 피드백)" />
+        <button class="wj-btn" id="wj-add-eval">추가</button>
+      </div>
+    </div>`;
+
+    document.getElementById('wj-manage-body').innerHTML = html;
+
+    document.getElementById('wj-add-eval').addEventListener('click', () => {
+      const val = document.getElementById('wj-new-eval').value.trim();
+      if (!val) return;
+      if (!state.evalItems.includes(val)) state.evalItems.push(val);
+      saveData(); render();
+    });
     document.querySelectorAll('[data-edit-eval]').forEach(btn => {
       btn.addEventListener('click', () => {
         state.editingEvalItem = btn.dataset.editEval;
@@ -2299,26 +2818,40 @@ ${notesText}`;
         if (newName !== oldName && state.evalItems.includes(newName)) { showToast('이미 존재하는 평가요소입니다.'); return; }
         state.evalItems = state.evalItems.map(it => it === oldName ? newName : it);
         state.entries.forEach(e => { if (e.evalItem === oldName) e.evalItem = newName; });
+        if (state.evalItemDetails[oldName] !== undefined) {
+          state.evalItemDetails[newName] = state.evalItemDetails[oldName];
+          delete state.evalItemDetails[oldName];
+        }
         state.editingEvalItem = null;
         saveData(); showToast('평가요소 이름이 수정되었습니다.'); render();
       });
     });
-
-    document.querySelectorAll('[data-del-goal]').forEach(btn => {
+    document.querySelectorAll('[data-toggle-eval-detail]').forEach(btn => {
       btn.addEventListener('click', () => {
-        state.goals = state.goals.filter(g => g !== btn.dataset.delGoal);
-        saveData(); render();
+        const name = state.evalItems[parseInt(btn.dataset.toggleEvalDetail, 10)];
+        state.expandedEvalDetail[name] = !state.expandedEvalDetail[name];
+        render();
+      });
+    });
+    document.querySelectorAll('[data-save-eval-detail]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.saveEvalDetail, 10);
+        const name = state.evalItems[idx];
+        const ta = document.getElementById(`wj-eval-detail-${idx}`);
+        state.evalItemDetails[name] = ta.value;
+        saveData(); showToast('설명이 저장되었습니다.'); render();
       });
     });
     document.querySelectorAll('[data-del-eval]').forEach(btn => {
       btn.addEventListener('click', () => {
         state.evalItems = state.evalItems.filter(it => it !== btn.dataset.delEval);
+        delete state.evalItemDetails[btn.dataset.delEval];
         saveData(); render();
       });
     });
   }
 
-  async function renderAdminTab() {
+  async function renderTeamAccountsTab() {
     document.getElementById('wj-content').innerHTML = `<div class="wj-card"><div class="wj-empty">불러오는 중...</div></div>`;
     let users = [];
     try {
@@ -2326,60 +2859,58 @@ ${notesText}`;
       if (res.ok) users = await res.json();
     } catch (e) {}
 
-    let html = `<div class="wj-card">
-      <h3>팀원 목록 (${users.length}명)</h3>
-      <p class="wj-card-note">누구나 가입 즉시 바로 사용할 수 있어요. 이 화면에서는 역할 변경과, 퇴사자 등 더 이상 접근하면 안 되는 계정을 내보내는 것만 할 수 있어요.</p>
+    const html = `<div class="wj-card">
+      <h3>팀원 계정 목록 (${users.length}명)</h3>
+      <p class="wj-card-note">누구나 가입 즉시 바로 사용할 수 있어요. 이 화면에서는 역할 변경과, 퇴사자 등 더 이상 접근하면 안 되는 계정을 내보내는 것만 할 수 있어요. 각 팀원의 개인 업무 기록 내용은 여기서도 조회할 수 없습니다.</p>
       ${users.map(u => `<div class="wj-manage-row">
-        <span>${esc(u.email)} <span class="wj-count-badge">${u.role === 'admin' ? '관리자' : '일반'}</span></span>
+        <span>${esc(u.email)} <span class="wj-count-badge">${u.role === 'admin' ? '계정관리자' : '일반'}</span></span>
         <div style="display:flex; gap:6px; align-items:center">
-          <select class="wj-select" style="width:auto; padding:5px 8px; font-size:12.5px" data-admin-role="${u.id}">
+          <select class="wj-select" style="width:auto; padding:5px 8px; font-size:12.5px" data-team-role="${u.id}">
             <option value="member" ${u.role==='member'?'selected':''}>일반</option>
-            <option value="admin" ${u.role==='admin'?'selected':''}>관리자</option>
+            <option value="admin" ${u.role==='admin'?'selected':''}>계정관리자</option>
           </select>
-          <button class="wj-btn danger-ghost" data-admin-remove="${u.id}">내보내기</button>
+          <button class="wj-btn danger-ghost" data-team-remove="${u.id}">내보내기</button>
         </div>
       </div>`).join('')}
-    </div>
-
-    <div class="wj-card">
-      <p class="wj-card-note">각 팀원의 개인 기록(업무 일지 내용)은 관리자도 조회할 수 없습니다. 이 화면은 역할 관리와 계정 내보내기만 다룹니다.</p>
     </div>`;
 
     document.getElementById('wj-content').innerHTML = html;
 
-    document.querySelectorAll('[data-admin-role]').forEach(sel => {
+    document.querySelectorAll('[data-team-role]').forEach(sel => {
       sel.addEventListener('change', async (e) => {
-        const res = await fetch(`/api/admin/users/${sel.dataset.adminRole}/role`, {
+        const res = await fetch(`/api/admin/users/${sel.dataset.teamRole}/role`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ role: e.target.value })
         });
         const data = await res.json();
-        if (!res.ok) { showToast(data.detail || '변경에 실패했습니다.'); renderAdminTab(); return; }
+        if (!res.ok) { showToast(data.detail || '변경에 실패했습니다.'); renderTeamAccountsTab(); return; }
         showToast('역할이 변경되었습니다.');
       });
     });
-    document.querySelectorAll('[data-admin-remove]').forEach(btn => {
+    document.querySelectorAll('[data-team-remove]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const res = await fetch(`/api/admin/users/${btn.dataset.adminRemove}/remove`, { method: 'POST' });
+        const res = await fetch(`/api/admin/users/${btn.dataset.teamRemove}/remove`, { method: 'POST' });
         const data = await res.json();
         if (!res.ok) { showToast(data.detail || '내보내기에 실패했습니다.'); return; }
         showToast('팀원을 내보냈습니다.');
-        renderAdminTab();
+        renderTeamAccountsTab();
       });
     });
   }
 
   function render() {
+    if (state.tab === 'admin' && state.myRole === 'member') state.tab = 'manage';
+    if (state.tab === 'teamaccounts' && !(window.__insysCurrentUser && window.__insysCurrentUser.role === 'admin')) state.tab = 'manage';
     renderTabs();
     if (!state.loaded) {
       document.getElementById('wj-content').innerHTML = `<div class="wj-empty">불러오는 중...</div>`;
       return;
     }
-    if (state.tab === 'goal') renderGoalTab();
-    else if (state.tab === 'record') renderRecordTab();
+    if (state.tab === 'record') renderRecordTab();
     else if (state.tab === 'view') renderViewTab();
-    else if (state.tab === 'manage') renderManageTab();
     else if (state.tab === 'admin') renderAdminTab();
+    else if (state.tab === 'teamaccounts') renderTeamAccountsTab();
+    else renderManageTab();
   }
 
   window.__insysInit = function() {
@@ -2400,7 +2931,6 @@ ${notesText}`;
   const noticeEl = document.getElementById('wj-auth-notice');
   const subEl = document.getElementById('wj-auth-title-sub');
   const switchWrap = document.getElementById('wj-auth-switch');
-  const switchLink = document.getElementById('wj-auth-switch-link');
   const logoutBtn = document.getElementById('wj-logout-btn');
   const userBadge = document.getElementById('wj-user-badge');
 
@@ -2441,7 +2971,7 @@ ${notesText}`;
   async function showApp(userInfo) {
     authScreen.style.display = 'none';
     appShell.style.display = 'block';
-    userBadge.textContent = `${userInfo.email}${userInfo.role === 'admin' ? ' · 관리자' : ''}`;
+    userBadge.textContent = `${userInfo.email}${userInfo.role === 'admin' ? ' · 계정관리자' : ''}`;
     window.__insysCurrentUser = userInfo;
     window.__insysInit();
   }
