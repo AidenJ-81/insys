@@ -365,6 +365,7 @@
     <aside class="wj-sidebar">
       <nav class="wj-tabs" id="wj-tabs"></nav>
       <div class="wj-user-badge" id="wj-user-badge"></div>
+      <button class="wj-logout-btn" id="wj-change-pw-btn">비밀번호 변경</button>
       <button class="wj-logout-btn" id="wj-logout-btn">로그아웃</button>
     </aside>
     <main class="wj-main">
@@ -373,6 +374,26 @@
   </div>
 </div>
 <div class="wj-toast" id="wj-toast"></div>
+</div>
+
+<div class="wj-modal-overlay" id="wj-changepw-overlay" style="display:none">
+  <div class="wj-modal-box" style="max-width:380px">
+    <div class="wj-modal-header">
+      <h3>비밀번호 변경</h3>
+      <button class="wj-modal-close" id="wj-changepw-close">×</button>
+    </div>
+    <div class="wj-field">
+      <label class="wj-auth-label">현재 비밀번호</label>
+      <input type="password" class="wj-auth-input" id="wj-changepw-current" />
+    </div>
+    <div class="wj-field">
+      <label class="wj-auth-label">새 비밀번호 (6자 이상)</label>
+      <input type="password" class="wj-auth-input" id="wj-changepw-new" />
+    </div>
+    <button class="wj-auth-btn" id="wj-changepw-submit">변경하기</button>
+    <div class="wj-auth-error" id="wj-changepw-error" style="display:none"></div>
+    <div class="wj-auth-notice" id="wj-changepw-notice" style="display:none"></div>
+  </div>
 </div>
 
 
@@ -508,7 +529,7 @@
     formContent: '', formStatus: '진행중', formEvalItem: '',
     viewPersonSel: '', viewGoalSel: '', personDeptFilter: '',
     recordSubTab: 'chat', viewSubTab: 'annual', manageSubTab: 'mbo', adminSubTab: 'permissions', quarterSel: '',
-    myRole: 'member', confirmTransfer: null,
+    myRole: 'member', confirmTransfer: null, resetPasswordResult: null,
     gsConfirmDelete: null,
     gsGoalSel: '', gsDesc: '', gsScopeNotes: '', gsPeriodStart: '', gsPeriodEnd: '', gsWeight: '', gsModalOpen: false,
     aiLoading: false, aiStrengths: '', aiImprovements: '', aiError: '', aiForPerson: '', aiItems: [],
@@ -2436,6 +2457,11 @@ ${notesText || '(기록 없음)'}
     const html = `<div class="wj-card">
       <h3>팀원 권한 관리</h3>
       <p class="wj-card-note">이 화면은 계정관리자만 볼 수 있어요. 권한은 <b>계정관리자 &gt; 관리자 &gt; 일반사용자</b> 순으로 상위가 하위 권한을 모두 포함해요. 계정관리자는 팀원 권한 관리를, 관리자는 회사 비전/조직문화·리더십 평가요소 관리를, 일반사용자는 그 외 모든 개인 기록 기능을 씁니다. 계정관리자는 최대 2명까지 지정할 수 있어요 (현재 ${accountAdminCount}명).</p>
+      ${state.resetPasswordResult ? `<div class="wj-preview" style="margin-bottom:12px">
+        <b>${esc(state.resetPasswordResult.email)}</b>의 새 임시 비밀번호: <code>${esc(state.resetPasswordResult.tempPassword)}</code><br/>
+        이 비밀번호를 본인에게 직접 전달해주세요. 로그인 후 "비밀번호 변경"으로 바꾸도록 안내해주시면 좋아요. (다시 볼 수 없으니 지금 복사해두세요)
+        <div style="margin-top:6px"><button class="wj-btn ghost small" id="wj-copy-temp-pw">복사</button> <button class="wj-btn ghost small" id="wj-dismiss-temp-pw">닫기</button></div>
+      </div>` : ''}
       ${users.map(u => {
         const isMe = u.email === (window.__insysCurrentUser && window.__insysCurrentUser.email);
         return `<div class="wj-manage-row">
@@ -2446,6 +2472,7 @@ ${notesText || '(기록 없음)'}
               <option value="admin" ${u.access_level==='admin'?'selected':''}>관리자</option>
               <option value="account_admin" ${u.access_level==='account_admin'?'selected':''}>계정관리자</option>
             </select>
+            ${!isMe ? `<button class="wj-btn ghost small" data-reset-pw="${u.id}" data-reset-pw-email="${esc(u.email)}">비밀번호 초기화</button>` : ''}
             ${!isMe ? `<button class="wj-btn danger-ghost" data-remove-user="${u.id}">내보내기</button>` : ''}
           </div>
         </div>`;
@@ -2497,6 +2524,27 @@ ${notesText || '(기록 없음)'}
         showToast('팀원을 내보냈습니다.');
         renderTeamAccessTab();
       });
+    });
+    document.querySelectorAll('[data-reset-pw]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const res = await fetch('/api/access/reset-password', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetUserId: parseInt(btn.dataset.resetPw, 10) })
+        });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.detail || '초기화에 실패했습니다.'); return; }
+        state.resetPasswordResult = { email: btn.dataset.resetPwEmail, tempPassword: data.tempPassword };
+        renderTeamAccessTab();
+      });
+    });
+    const copyTempPwBtn = document.getElementById('wj-copy-temp-pw');
+    if (copyTempPwBtn) copyTempPwBtn.addEventListener('click', () => {
+      copyText(state.resetPasswordResult.tempPassword, '임시 비밀번호가 복사되었습니다.');
+    });
+    const dismissTempPwBtn = document.getElementById('wj-dismiss-temp-pw');
+    if (dismissTempPwBtn) dismissTempPwBtn.addEventListener('click', () => {
+      state.resetPasswordResult = null;
+      renderTeamAccessTab();
     });
     document.getElementById('wj-transfer-btn').addEventListener('click', () => {
       const sel = document.getElementById('wj-transfer-select').value;
@@ -2857,6 +2905,14 @@ ${notesText || '(기록 없음)'}
   const switchWrap = document.getElementById('wj-auth-switch');
   const logoutBtn = document.getElementById('wj-logout-btn');
   const userBadge = document.getElementById('wj-user-badge');
+  const changePwBtn = document.getElementById('wj-change-pw-btn');
+  const changePwOverlay = document.getElementById('wj-changepw-overlay');
+  const changePwClose = document.getElementById('wj-changepw-close');
+  const changePwSubmit = document.getElementById('wj-changepw-submit');
+  const changePwCurrent = document.getElementById('wj-changepw-current');
+  const changePwNew = document.getElementById('wj-changepw-new');
+  const changePwError = document.getElementById('wj-changepw-error');
+  const changePwNotice = document.getElementById('wj-changepw-notice');
 
   let mode = 'login'; // 'login' | 'signup'
 
@@ -2951,6 +3007,55 @@ ${notesText || '(기록 없음)'}
   logoutBtn.addEventListener('click', async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     location.reload();
+  });
+
+  function openChangePwModal() {
+    changePwCurrent.value = '';
+    changePwNew.value = '';
+    changePwError.style.display = 'none';
+    changePwNotice.style.display = 'none';
+    changePwOverlay.style.display = 'flex';
+  }
+  function closeChangePwModal() {
+    changePwOverlay.style.display = 'none';
+  }
+  changePwBtn.addEventListener('click', openChangePwModal);
+  changePwClose.addEventListener('click', closeChangePwModal);
+  changePwOverlay.addEventListener('click', (e) => {
+    if (e.target === changePwOverlay) closeChangePwModal();
+  });
+  changePwSubmit.addEventListener('click', async () => {
+    changePwError.style.display = 'none';
+    changePwNotice.style.display = 'none';
+    const currentPassword = changePwCurrent.value;
+    const newPassword = changePwNew.value;
+    if (!currentPassword || !newPassword) {
+      changePwError.textContent = '현재 비밀번호와 새 비밀번호를 모두 입력해주세요.';
+      changePwError.style.display = 'block';
+      return;
+    }
+    changePwSubmit.disabled = true;
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        changePwError.textContent = data.detail || '변경에 실패했습니다.';
+        changePwError.style.display = 'block';
+        return;
+      }
+      changePwNotice.textContent = '비밀번호가 변경되었습니다.';
+      changePwNotice.style.display = 'block';
+      changePwCurrent.value = '';
+      changePwNew.value = '';
+    } catch (e) {
+      changePwError.textContent = '네트워크 오류가 발생했습니다.';
+      changePwError.style.display = 'block';
+    } finally {
+      changePwSubmit.disabled = false;
+    }
   });
 
   document.getElementById('wj-auth-switch-link').addEventListener('click', () => {

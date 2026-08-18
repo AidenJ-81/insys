@@ -324,6 +324,15 @@ class RemoveUserBody(BaseModel):
     targetUserId: int
 
 
+class ChangePasswordBody(BaseModel):
+    currentPassword: str
+    newPassword: str
+
+
+class ResetPasswordBody(BaseModel):
+    targetUserId: int
+
+
 class AIBody(BaseModel):
     prompt: str = ""
     max_tokens: int = 1200
@@ -491,6 +500,38 @@ def remove_access_user(body: RemoveUserBody, request: Request):
         conn.execute("DELETE FROM users WHERE id = ?", (body.targetUserId,))
         conn.execute("DELETE FROM user_data WHERE user_id = ?", (body.targetUserId,))
         conn.execute("DELETE FROM sessions WHERE user_id = ?", (body.targetUserId,))
+        conn.commit()
+    return {"status": "ok"}
+
+
+@app.post("/api/access/reset-password")
+def reset_password(body: ResetPasswordBody, request: Request):
+    require_account_admin(request)
+    with closing(get_db()) as conn:
+        target = conn.execute("SELECT id FROM users WHERE id = ?", (body.targetUserId,)).fetchone()
+        if not target:
+            raise HTTPException(404, "사용자를 찾을 수 없습니다.")
+        temp_password = secrets.token_urlsafe(9)  # 임시 비밀번호 (관리자가 대상자에게 직접 전달)
+        salt = make_salt()
+        pw_hash = hash_password(temp_password, salt)
+        conn.execute("UPDATE users SET password_hash = ?, salt = ? WHERE id = ?", (pw_hash, salt, body.targetUserId))
+        # 기존 로그인 세션은 모두 끊어서, 새 비밀번호로 다시 로그인하도록 한다.
+        conn.execute("DELETE FROM sessions WHERE user_id = ?", (body.targetUserId,))
+        conn.commit()
+    return {"status": "ok", "tempPassword": temp_password}
+
+
+@app.post("/api/auth/change-password")
+def change_password(body: ChangePasswordBody, request: Request):
+    user = require_user(request)
+    if hash_password(body.currentPassword, user["salt"]) != user["password_hash"]:
+        raise HTTPException(401, "현재 비밀번호가 올바르지 않습니다.")
+    if len(body.newPassword) < 6:
+        raise HTTPException(400, "새 비밀번호는 6자 이상이어야 합니다.")
+    salt = make_salt()
+    pw_hash = hash_password(body.newPassword, salt)
+    with closing(get_db()) as conn:
+        conn.execute("UPDATE users SET password_hash = ?, salt = ? WHERE id = ?", (pw_hash, salt, user["id"]))
         conn.commit()
     return {"status": "ok"}
 
