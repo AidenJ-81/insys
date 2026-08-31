@@ -401,15 +401,30 @@
 (function() {
   const TAG_COLORS = ['#2C5F6F', '#B8892E', '#8B5A6B', '#4A7856', '#6B5B95', '#B3423A'];
   function buildAnonymizationMap() {
+    const pairs = [];
+    state.people.forEach((name, i) => {
+      const placeholder = `구성원${i + 1}`;
+      pairs.push([name, placeholder]);
+      // 성을 뗀 이름 + 흔한 호칭(님/씨) 조합도 같은 사람으로 인식하게 함
+      // (예: "장강원" 등록 -> "강원님"이라고만 불러도 매칭됨)
+      if (name.length >= 2) {
+        const given = name.slice(1);
+        if (given.length >= 1) {
+          // 확실한 형태 - AI가 바로 확정해서 진행해도 됨
+          pairs.push([given + '님', placeholder + '님']);
+          pairs.push([given + '씨', placeholder + '씨']);
+          // 캐주얼한 형태 - 다른 단어와 헷갈릴 수 있어 AI가 항상 되물어 확인해야 함
+          pairs.push([given + '아', placeholder + '아']);
+          pairs.push([given + '야', placeholder + '야']);
+          pairs.push([given + '이', placeholder + '이']);
+        }
+      }
+    });
+    pairs.sort((a, b) => b[0].length - a[0].length);
     const forward = {};
     const reverse = {};
-    state.people.slice()
-      .sort((a, b) => b.length - a.length)
-      .forEach((name, i) => {
-        const placeholder = `구성원${i + 1}`;
-        forward[name] = placeholder;
-        reverse[placeholder] = name;
-      });
+    pairs.forEach(([key, placeholder]) => { forward[key] = placeholder; });
+    state.people.forEach((name, i) => { reverse[`구성원${i + 1}`] = name; });
     return { forward, reverse };
   }
 
@@ -542,7 +557,7 @@
     chatPersona: 'default', companyProfile: '', companyProfileDraft: '',
     profileFileLoading: false, profileFileError: '',
     chatDateStart: getWeekMonday(todayStr()), chatDateEnd: getWeekSunday(todayStr()),
-    chatWindowExpanded: false, expandedEntry: {}, awaitingAttachmentFor: null,
+    chatWindowExpanded: false, expandedEntry: {}, awaitingAttachmentFor: null, confirmedCasualNames: [],
     browseSearch: '', browseCalMonth: todayStr().slice(0,7), browseSelectedDate: null,
     browseVisibleCount: 20, browsePageSize: 20, calendarModalDate: null,
     loaded: false
@@ -1491,7 +1506,12 @@
             return `- ${g}\n  설명: ${anonymizeText(d.description, forward) || '(설명 없음)'}\n  포함되는 활동 예시(경계 정의): ${anonymizeText(d.scopeNotes, forward) || '(작성 안 됨)'}\n  최근 기록 예시: ${examples || '없음'}`;
           }).join('\n')
         : '(등록된 목표 없음)';
-      const peopleContext = state.people.length > 0 ? state.people.map(p => forward[p]).join(', ') : '(등록된 협업 대상 없음)';
+      const peopleContext = state.people.length > 0
+        ? state.people.map(p => `${forward[p]}${state.personDept[p] ? ` (${state.personDept[p]})` : ''}`).join(', ')
+        : '(등록된 협업 대상 없음)';
+      const confirmedCasualContext = state.confirmedCasualNames.length > 0
+        ? state.confirmedCasualNames.map(p => forward[p]).join(', ')
+        : '';
       const openItems = state.entries.filter(e => e.type === 'work' && e.status === '진행중');
       const openItemsContext = openItems.length > 0
         ? openItems.map(e => `- [id:${e.id}] (목표: ${e.tag}, ${fmtEntryDate(e)}) ${anonymizeText(e.content, forward)}`).join('\n')
@@ -1507,7 +1527,7 @@ ${goalsContext}
 
 [등록된 협업 대상 목록]
 ${peopleContext}
-
+${confirmedCasualContext ? `\n[이번 대화에서 이미 확인된 사람] ${confirmedCasualContext} — 이 사람들은 캐주얼한 호칭(아/야/이 등)으로 다시 언급되어도 이미 확인이 끝난 상태이니 더 이상 부서를 되묻지 말고 바로 그 사람으로 처리하세요.\n` : ''}
 [진행중(미완료) 업무 목록]
 ${openItemsContext}
 
@@ -1544,13 +1564,18 @@ entries를 채울 때:
 3. type이 "work"인 경우, 위 목표 목록과 비교해서 가장 잘 맞는 기존 목표를 tag로 고르세요. 각 목표의 "포함되는 활동 예시"가 작성되어 있다면 그것을 "설명"보다 우선적인 근거로 삼으세요 (그 경계 정의는 사용자가 직접 정해둔 것이라 가장 정확합니다). 그래도 애매하면 앞서 말한 대로 되물으세요. 맞는 게 없으면 새 이름을 만드세요.
 4. type과 무관하게(업무든 협업이든), 이 내용이 위 목표 목록 중 어느 하나의 실제성과 근거가 될 수 있는지 목표 설명과 최근 기록 예시를 근거로 판단하세요. type이 "work"라면 주 목표(tag) 외의 다른 목표도 확인하고, type이 "person"이라면 이 협업 활동 자체가 어떤 목표의 성과 증거가 될 수 있는지 확인하세요 (예: "동료 설득해 A 도입 결정"은 "A 도입" 목표의 증거가 될 수 있음). 근거가 빈약하면 relatedGoals를 빈 배열로 두세요. 절대 억지로 만들지 마세요.
 5. relatedGoals의 각 항목에는 goal(목표명), reason(한 문장 근거), confidence("high"|"medium"|"low")를 포함하세요.
-6. type이 "person"인 경우 tag는 위 협업 대상 목록에서 고르거나, 목록에 없으면 대화에서 언급된 이름을 쓰세요. 이름이 불명확하면 "미지정"으로 두세요.
+6. type이 "person"인 경우 tag는 위 협업 대상 목록에서 고르거나, 목록에 없으면 대화에서 언급된 이름을 쓰세요. 이름이 불명확하면 "미지정"으로 두세요. 협업 대상 목록에는 이름 옆에 부서가 괄호로 표시되어 있습니다. 사용자가 성을 뺀 이름으로 사람을 언급하면 표기 형태에 따라 확신 정도가 다릅니다:
+- "구성원N님"/"구성원N씨"처럼 정중한 호칭이 붙은 경우: 확실한 매칭이니 되묻지 말고 바로 그 사람으로 진행하세요.
+- "구성원N아"/"구성원N야"/"구성원N이"처럼 캐주얼한 호칭·조사가 붙은 경우: 먼저 [이번 대화에서 이미 확인된 사람] 목록에 그 사람이 있는지 확인하세요. 있으면 되묻지 말고 바로 진행하세요. 없으면, 다른 단어(지명 등)와 우연히 겹쳤을 수 있으니 문맥상 사람 얘기가 명백하지 않다면 entries를 만들기 전에 반드시 부서명과 함께 자연스럽게 되물어 확인하세요 (예: "혹시 DX팀의 구성원1님 얘기하시는 거예요?"). 문맥상 확실히 사람 얘기면(예: "~랑 회의했어" 처럼 사람에게만 쓰는 표현이 같이 있으면) 되묻지 않아도 됩니다.
 7. entries를 만들 때, 그 내용이 [진행중(미완료) 업무 목록]에 있는 항목 중 하나를 실제로 이어서 진행했거나 마무리한 것처럼 보이면, 그 항목의 id를 completesEntryId에 넣으세요 (id는 목록의 [id:xxxx] 부분입니다). 확신이 없으면 completesEntryId는 빈 문자열로 두세요. 이 경우 reply에서 자연스럽게 확인하세요 (예: "지난번 말씀하신 OO 관련 후속 작업이네요, 그 항목 완료로 표시할까요?").
 
 reply 필드:
 - 되묻는 경우: 자연스러운 질문 문장만 담으세요 (1~2문장). entries는 빈 배열로 두세요.
 - 진행 상황을 물어본 경우: 위 지침대로 답변하세요. entries는 빈 배열로 두세요.
-- 기록을 만드는 경우: 무엇을 어떻게 정리했는지 짧게 확인해주는 문장을 담으세요 (1~2문장). completesEntryId를 채웠다면 그 확인 질문도 포함하세요.
+- 기록을 만드는 경우: "기록해뒀습니다" 식의 사무적인 확인 멘트로 끝내지 마세요. 대신 실제 동료가 궁금해서 되묻듯이, 이 내용에서 아직 안 나온 흥미로운 부분을 하나 자연스럽게 물어보세요 — 예를 들어 누구와 함께했는지, 반응이 어땠는지, 어떤 계기였는지, 다음엔 뭘 할 계획인지 등. 이미 그 정보가 메시지에 다 담겨 있다면 억지로 묻지 말고 짧게 공감·리액션만 하세요. 이 질문은 정보를 캐내려는 게 아니라 대화가 자연스럽게 이어지도록 하는 것이 목적입니다 — 딱딱한 체크리스트처럼 느껴지면 안 됩니다. completesEntryId를 채웠다면 그 확인 질문도 포함하세요.
+- 사용자가 방금 만들어진 기록에 대해 위 질문에 답하며 새로운 내용(협업 대상, 배경, 결과 등)을 추가로 알려주면, 새 항목을 또 만들지 말고 [최근 대화]에서 방금 그 기록의 내용을 찾아 그 내용을 보강한 새로운 content로 다시 만드세요 (마치 기존 기록을 수정하듯). 이때도 다른 대상/목표로 완전히 갈라지는 별개의 얘기라면 새 항목으로 분리하세요.
+- 절대 "저장했습니다", "기록했습니다"처럼 이미 확정 저장된 것처럼 말하지 마세요. 실제로는 사용자가 아래 후보 목록에서 "저장" 버튼을 눌러야 최종 저장됩니다. "이렇게 정리해봤어요", "확인해서 저장해주세요"처럼 아직 확인이 필요하다는 뉘앙스로 표현하세요.
+- 중복 기록 방지: [최근 대화]에서 바로 이전 AI 턴이 이미 기록을 제안했는데, 이번 사용자 메시지가 "그래", "응", "네", "좋아", "ㅇㅇ", "ok", "넵" 같은 단순 동의/확인 표현뿐이고 새로운 정보가 없다면, 그건 방금 제안한 걸 저장해달라는 뜻이지 또 다른 기록을 만들라는 게 아닙니다. 이 경우 entries는 반드시 빈 배열로 두고, reply에는 "네! 아래 목록에서 저장 버튼 눌러주시면 반영돼요" 처럼 안내만 짧게 하세요.
 - reply의 말투: ${PERSONA_PROMPTS[state.chatPersona] || PERSONA_PROMPTS.default}
 - 중요: 이 말투는 reply 필드에만 적용하세요. entries 안의 content 필드는 말투와 무관하게 항상 정중하고 사무적인 문체로 작성하세요 — 이 내용은 실제 회사 평가 시스템(MBO, S-Talk, 리더십 진단)에 그대로 복사되어 들어가기 때문입니다.
 
@@ -1601,6 +1626,13 @@ reply 필드:
         };
       });
       state.chatPending = state.chatPending.concat(newPending);
+
+      // 이번 턴에서 사람으로 확정된 항목이 있으면, 캐주얼 호칭이어도 다음부터 안 물어보도록 기억해둔다.
+      newPending.forEach(p => {
+        if (p.type === 'person' && p.tag && state.people.includes(p.tag) && !state.confirmedCasualNames.includes(p.tag)) {
+          state.confirmedCasualNames.push(p.tag);
+        }
+      });
     } catch (e) {
       state.chatError = '분석에 실패했습니다. 다시 시도해주세요.';
     }
