@@ -3027,7 +3027,7 @@ ${notesText || '(기록 없음)'}
         });
         const data = await res.json();
         if (!res.ok) { showError(data.detail || '가입에 실패했습니다.'); return; }
-        showApp({ email, role: data.role || 'member' });
+        showApp({ email, accessLevel: data.accessLevel || 'member' });
       }
     } catch (e) {
       showError('네트워크 오류가 발생했습니다.');
