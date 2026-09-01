@@ -3,6 +3,9 @@ import json
 import sqlite3
 import hashlib
 import secrets
+import threading
+import time
+import traceback
 import urllib.request
 import urllib.error
 from contextlib import closing
@@ -29,6 +32,41 @@ AI_API_KEY = os.environ.get("AI_API_KEY", "")
 AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
 AI_BASE_URL = os.environ.get("AI_BASE_URL", "")  # custom 제공자(예: 웍스AI) 사용 시 엔드포인트 지정
 AI_AGENT_ID = os.environ.get("AI_AGENT_ID", "")  # 웍스AI 전용 - 사용할 에이전트 ID
+
+# 자동 백업 설정
+# BACKUP_DIR 을 따로 주지 않으면 DB 파일과 같은 폴더 아래 backups/ 를 쓴다.
+# DB_PATH가 /data/app.db 이므로 기본값은 /data/backups/ 가 되고, 이는 Coolify 볼륨 안이라
+# 재배포해도 남는다. (볼륨 밖에 두면 백업 자체가 사라지므로 의미가 없다.)
+BACKUP_DIR = os.environ.get("BACKUP_DIR", "").strip()
+BACKUP_KEEP = int(os.environ.get("BACKUP_KEEP", "14"))  # 보관할 백업 개수
+BACKUP_INTERVAL_HOURS = float(os.environ.get("BACKUP_INTERVAL_HOURS", "24"))
+
+# 계정관리자는 최대 2명.
+MAX_ACCOUNT_ADMINS = 2
+
+# 비상용 계정관리자 지정 (환경변수)
+# 예: ACCOUNT_ADMIN_EMAILS=hong@xicna.com,kim@xicna.com  (쉼표로 구분, 최대 2명)
+# 여기 적힌 이메일은 서버가 시작될 때마다 계정관리자로 맞춰집니다. 아직 가입 전이면
+# 나중에 그 이메일로 가입하는 순간 계정관리자가 됩니다.
+# 계정관리자를 실수로 양도했거나 관리자 계정이 전부 사라졌을 때, 코드를 고치지 않고
+# Coolify에서 값만 넣고 재배포하면 복구되는 비상 통로입니다.
+def _parse_admin_emails(raw: str) -> list:
+    seen = []
+    for part in raw.replace(";", ",").replace("\n", ",").split(","):
+        email = part.strip().lower()
+        if email and email not in seen:
+            seen.append(email)
+    if len(seen) > MAX_ACCOUNT_ADMINS:
+        print(
+            f"[config] ACCOUNT_ADMIN_EMAILS에 {len(seen)}개가 지정됐지만 계정관리자는 최대 "
+            f"{MAX_ACCOUNT_ADMINS}명이라 앞의 {MAX_ACCOUNT_ADMINS}개만 사용합니다: {seen[:MAX_ACCOUNT_ADMINS]}",
+            flush=True,
+        )
+        seen = seen[:MAX_ACCOUNT_ADMINS]
+    return seen
+
+
+ACCOUNT_ADMIN_EMAILS = _parse_admin_emails(os.environ.get("ACCOUNT_ADMIN_EMAILS", ""))
 
 app = FastAPI(title="INSYS")
 
@@ -124,6 +162,55 @@ DEFAULT_COMPANY_PROFILE = """[비전] 국내 Top Tier 산업플랜트 Provider
 우리는 배움을 두려워하지 않는 전문가이며, 언제나 솔직하게 소통하는 하나의 팀이다."""
 
 
+def free_account_admin_slot(conn) -> bool:
+    """계정관리자 자리가 꽉 찼으면, 환경변수에 없는 계정관리자 중 가장 최근 사람을
+    관리자로 내려서 자리를 하나 만든다. 자리를 만들었거나 원래 여유가 있으면 True."""
+    count = conn.execute(
+        "SELECT COUNT(*) c FROM users WHERE access_level = 'account_admin'"
+    ).fetchone()["c"]
+    if count < MAX_ACCOUNT_ADMINS:
+        return True
+    if ACCOUNT_ADMIN_EMAILS:
+        placeholders = ",".join("?" * len(ACCOUNT_ADMIN_EMAILS))
+        victim = conn.execute(
+            f"SELECT id, email FROM users WHERE access_level = 'account_admin' "
+            f"AND lower(email) NOT IN ({placeholders}) ORDER BY created_at DESC LIMIT 1",
+            ACCOUNT_ADMIN_EMAILS,
+        ).fetchone()
+    else:
+        victim = conn.execute(
+            "SELECT id, email FROM users WHERE access_level = 'account_admin' "
+            "ORDER BY created_at DESC LIMIT 1"
+        ).fetchone()
+    if not victim:
+        return False
+    conn.execute("UPDATE users SET access_level = 'admin' WHERE id = ?", (victim["id"],))
+    print(f"[config] 자리 확보를 위해 {victim['email']} 를 관리자로 조정했습니다.", flush=True)
+    return True
+
+
+def apply_env_account_admins(conn):
+    """ACCOUNT_ADMIN_EMAILS에 적힌 계정을 계정관리자로 맞춘다.
+    아직 가입하지 않은 이메일은 나중에 가입할 때 signup에서 처리된다."""
+    if not ACCOUNT_ADMIN_EMAILS:
+        return
+    for email in ACCOUNT_ADMIN_EMAILS:
+        row = conn.execute(
+            "SELECT id, access_level FROM users WHERE lower(email) = ?", (email,)
+        ).fetchone()
+        if not row:
+            print(f"[config] 계정관리자 지정 대기: {email} (아직 가입 전)", flush=True)
+            continue
+        if row["access_level"] == "account_admin":
+            continue
+        if not free_account_admin_slot(conn):
+            print(f"[config] 계정관리자 자리가 없어 {email} 승격을 건너뜁니다.", flush=True)
+            continue
+        conn.execute("UPDATE users SET access_level = 'account_admin' WHERE id = ?", (row["id"],))
+        print(f"[config] {email} 를 계정관리자로 지정했습니다.", flush=True)
+    conn.commit()
+
+
 def init_db():
     with closing(get_db()) as conn:
         conn.executescript(
@@ -193,6 +280,10 @@ def init_db():
                 conn.execute("UPDATE users SET access_level = 'admin' WHERE id = ?", (extra["id"],))
             conn.commit()
 
+        # 환경변수로 지정된 비상 계정관리자를 반영한다. 위의 정리 작업보다 뒤에 실행해서,
+        # 환경변수 지정이 항상 우선하도록 한다.
+        apply_env_account_admins(conn)
+
         row = conn.execute("SELECT id FROM company_settings WHERE id = 1").fetchone()
         if not row:
             conn.execute(
@@ -223,6 +314,142 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 init_db()
+
+
+# ---------------------------------------------------------------------------
+# 자동 백업
+# ---------------------------------------------------------------------------
+# 하루 한 번 DB 스냅샷을 볼륨 안의 backups/ 폴더에 남긴다.
+# 단순 파일 복사(shutil.copy)는 쓰기 도중에 복사하면 깨진 파일이 나올 수 있어서,
+# SQLite가 제공하는 온라인 백업 API를 쓴다. 서비스가 돌아가는 중에도 안전하다.
+#
+# 중요: 내용이 바뀌지 않았으면 새 백업을 남기지 않는다.
+# 매일 무조건 남기면, 앱을 한 달간 안 쓴 경우 똑같은 내용의 파일 14개가 쌓여서
+# 보관 개수만 채우고 실제로는 "최근 하루치"밖에 못 지키게 된다. 변경이 있을 때만
+# 남기면 14개가 실제 변경 14회를 가리키므로 되돌릴 수 있는 범위가 훨씬 넓어진다.
+def backup_dir() -> Path:
+    return Path(BACKUP_DIR) if BACKUP_DIR else Path(DB_PATH).parent / "backups"
+
+
+def _data_fingerprint(path) -> str:
+    """DB 안의 '지킬 가치가 있는 내용'만 뽑아 만든 해시.
+    로그인 세션(sessions)은 제외한다. 세션까지 포함해서 비교하면, 누가 로그인만 하고
+    아무것도 쓰지 않아도 '변경됨'으로 잡혀서 똑같은 내용의 백업이 쌓이게 된다."""
+    h = hashlib.sha256()
+    conn = sqlite3.connect(str(path))
+    try:
+        for table in ("users", "user_data", "company_settings"):
+            try:
+                rows = conn.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall()
+            except sqlite3.Error:
+                rows = []
+            h.update(table.encode("utf-8"))
+            for row in rows:
+                h.update(repr(row).encode("utf-8"))
+            h.update(b"\x00")
+    finally:
+        conn.close()
+    return h.hexdigest()
+
+
+def latest_backup_path():
+    """가장 최근에 만들어진 백업 파일. 파일명(날짜)이 아니라 실제 수정 시각으로 고른다.
+    서버 시계나 시간대가 어긋나 파일명 순서가 실제 순서와 달라져도 안전하게 동작한다."""
+    target_dir = backup_dir()
+    if not target_dir.exists():
+        return None
+    files = list(target_dir.glob("app-*.db"))
+    if not files:
+        return None
+    return max(files, key=lambda f: f.stat().st_mtime)
+
+
+def create_backup(force: bool = False) -> Optional[str]:
+    """DB 스냅샷을 만든다.
+    직전 백업과 내용이 같으면 만들지 않고 None을 돌려준다.
+    force=True면 내용이 같아도 만든다 (화면의 '지금 한 번 백업하기' 버튼용)."""
+    target_dir = backup_dir()
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    tmp_path = target_dir / f".tmp-{secrets.token_hex(4)}.db"
+    src = sqlite3.connect(DB_PATH)
+    try:
+        dst = sqlite3.connect(str(tmp_path))
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+    finally:
+        src.close()
+
+    try:
+        # 직전 백업과 내용이 같으면 버린다.
+        if not force:
+            prev = latest_backup_path()
+            if prev and _data_fingerprint(prev) == _data_fingerprint(tmp_path):
+                tmp_path.unlink()
+                return None
+
+        stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        final_path = target_dir / f"app-{stamp}.db"
+        # 같은 날 두 번 이상 바뀌면 그날 파일을 최신 내용으로 덮어쓴다 (하루 한 개 유지).
+        os.replace(tmp_path, final_path)
+    except Exception:
+        if tmp_path.exists():
+            tmp_path.unlink()
+        raise
+
+    prune_backups()
+    return final_path.name
+
+
+def prune_backups():
+    """오래된 백업을 지우고 최근 BACKUP_KEEP 개만 남긴다."""
+    target_dir = backup_dir()
+    if not target_dir.exists():
+        return
+    files = sorted(target_dir.glob("app-*.db"))  # 파일명이 날짜라서 이름순 = 오래된 순
+    for old in files[:-BACKUP_KEEP] if BACKUP_KEEP > 0 else []:
+        try:
+            old.unlink()
+        except Exception:
+            pass
+
+
+def list_backups() -> list:
+    target_dir = backup_dir()
+    if not target_dir.exists():
+        return []
+    out = []
+    for f in sorted(target_dir.glob("app-*.db"), reverse=True):
+        try:
+            st = f.stat()
+        except Exception:
+            continue
+        out.append({
+            "name": f.name,
+            "sizeBytes": st.st_size,
+            "createdAt": datetime.fromtimestamp(st.st_mtime, timezone.utc).isoformat(),
+        })
+    return out
+
+
+def _backup_loop():
+    # 컨테이너가 뜨자마자 한 번 확인하고, 그다음부터 주기적으로 반복한다.
+    while True:
+        try:
+            name = create_backup()
+            if name:
+                print(f"[backup] 백업 완료: {name}", flush=True)
+            else:
+                print("[backup] 변경 없음 - 새 백업을 만들지 않았습니다.", flush=True)
+        except Exception:
+            print("[backup] 백업 실패:\n" + traceback.format_exc(), flush=True)
+        time.sleep(max(BACKUP_INTERVAL_HOURS, 0.1) * 3600)
+
+
+if BACKUP_KEEP > 0:
+    threading.Thread(target=_backup_loop, name="insys-backup", daemon=True).start()
 
 
 # ---------------------------------------------------------------------------
@@ -358,11 +585,16 @@ def signup(body: AuthBody, response: Response):
     with closing(get_db()) as conn:
         existing = conn.execute("SELECT COUNT(*) c FROM users").fetchone()["c"]
         is_first = existing == 0
+        # 환경변수로 지정해둔 이메일이면, 첫 가입자가 아니어도 계정관리자로 만든다.
+        forced_admin = email in ACCOUNT_ADMIN_EMAILS
+        if forced_admin and not is_first:
+            forced_admin = free_account_admin_slot(conn)
+        level = "account_admin" if (is_first or forced_admin) else "member"
         try:
             cur = conn.execute(
                 "INSERT INTO users (email, password_hash, salt, access_level, approved, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
-                (email, pw_hash, salt, "account_admin" if is_first else "member", 1, now_iso()),
+                (email, pw_hash, salt, level, 1, now_iso()),
             )
         except sqlite3.IntegrityError:
             raise HTTPException(400, "이미 가입된 이메일입니다.")
@@ -378,7 +610,7 @@ def signup(body: AuthBody, response: Response):
     set_session_cookie(response, token)
     return {
         "status": "ok", "approved": True,
-        "accessLevel": "account_admin" if is_first else "member",
+        "accessLevel": level,
     }
 
 
@@ -422,7 +654,6 @@ def me(request: Request):
 # 계정 접근권한 관리 API - 계정관리자(account_admin) 전용.
 # 계층: account_admin(최대 2명) > admin > member. 상위는 하위 권한을 모두 포함한다.
 # ---------------------------------------------------------------------------
-MAX_ACCOUNT_ADMINS = 2
 
 
 @app.get("/api/access/users")
@@ -534,6 +765,34 @@ def change_password(body: ChangePasswordBody, request: Request):
         conn.execute("UPDATE users SET password_hash = ?, salt = ? WHERE id = ?", (pw_hash, salt, user["id"]))
         conn.commit()
     return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# 서버 자동 백업 상태 확인 - 계정관리자 전용.
+# 백업 "파일 내려받기"는 일부러 만들지 않았다. app.db 안에는 전 직원의 기록이 들어있어서,
+# 계정관리자라도 다운로드할 수 있게 하면 "관리자도 남의 기록은 못 본다"는 원칙이 깨진다.
+# 서버 파일을 직접 꺼내야 할 상황이라면 인프라 담당자가 서버에서 직접 가져가야 한다.
+# ---------------------------------------------------------------------------
+@app.get("/api/admin/backups")
+def get_backups(request: Request):
+    require_account_admin(request)
+    return {
+        "backupDir": str(backup_dir()),
+        "keep": BACKUP_KEEP,
+        "intervalHours": BACKUP_INTERVAL_HOURS,
+        "backups": list_backups(),
+    }
+
+
+@app.post("/api/admin/backups/run")
+def run_backup(request: Request):
+    require_account_admin(request)
+    try:
+        # 사람이 직접 누른 경우는 내용이 같아도 남긴다.
+        name = create_backup(force=True)
+    except Exception as e:
+        raise HTTPException(500, f"백업에 실패했습니다: {e}")
+    return {"status": "ok", "name": name, "backups": list_backups()}
 
 
 # ---------------------------------------------------------------------------

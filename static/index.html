@@ -149,6 +149,19 @@
   }
   .wj-toast.show { opacity: 1; }
 
+  /* 백업 알림 배너 - 마지막 백업 후 오래 지났을 때 화면 맨 위에 뜬다 */
+  .wj-backup-banner {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: #fff7ed; border: 1px solid #fdba74; border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 14px;
+  }
+  .wj-backup-banner.urgent { background: #fef2f2; border-color: #fca5a5; }
+  .wj-backup-banner-text { flex: 1; min-width: 200px; font-size: 13px; color: #7c2d12; line-height: 1.55; }
+  .wj-backup-banner.urgent .wj-backup-banner-text { color: #7f1d1d; }
+  .wj-backup-banner-text strong { font-weight: 700; }
+  .wj-backup-banner-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .wj-backup-banner .wj-btn { padding: 7px 12px; font-size: 12.5px; }
+
   .wj-select-row { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
   .wj-select-row .wj-select { flex: 1; }
   .wj-count-badge { font-size: 11.5px; color: var(--ink-soft); background: var(--bg); padding: 2px 8px; border-radius: 100px; }
@@ -369,6 +382,7 @@
       <button class="wj-logout-btn" id="wj-logout-btn">로그아웃</button>
     </aside>
     <main class="wj-main">
+      <div id="wj-backup-banner"></div>
       <div id="wj-content"></div>
     </main>
   </div>
@@ -534,7 +548,7 @@
     departments: [], personDept: {},
     editingDept: null, editingDeptValue: '',
     editingPerson: null, editingPersonValue: '',
-    importPreview: null, importPendingData: null, importError: '',
+    importPreview: null, importPendingData: null, importError: '', importRestoreCompany: false,
     editingEntryId: null, confirmDeleteId: null, addingAttachmentFor: null,
     editingGoal: null, editingGoalValue: '',
     editingEvalItem: null, editingEvalItemValue: '', expandedEvalDetail: {},
@@ -560,8 +574,15 @@
     chatWindowExpanded: false, expandedEntry: {}, awaitingAttachmentFor: null, confirmedCasualNames: [],
     browseSearch: '', browseCalMonth: todayStr().slice(0,7), browseSelectedDate: null,
     browseVisibleCount: 20, browsePageSize: 20, calendarModalDate: null,
+    lastExportAt: '', backupBannerDismissedAt: '',
+    backupInfo: null, backupInfoLoading: false,
+    confirmRemoveUser: null,
     loaded: false
   };
+
+  // 마지막 내보내기 후 이 일수가 지나면 배너로 알린다.
+  const BACKUP_REMIND_DAYS = 7;
+  const BACKUP_URGENT_DAYS = 21;
 
   const STORAGE_KEY = 'work-journal-data';
 
@@ -585,6 +606,8 @@
         });
         state.goalDetails = parsed.goalDetails || {};
         state.chatPersona = parsed.chatPersona || 'default';
+        state.lastExportAt = parsed.lastExportAt || '';
+        state.backupBannerDismissedAt = parsed.backupBannerDismissedAt || '';
       }
     } catch (e) {}
     await loadCompanySettings();
@@ -601,7 +624,9 @@
           data: {
             people: state.people, goals: state.goals,
             departments: state.departments, personDept: state.personDept,
-            entries: state.entries, goalDetails: state.goalDetails, chatPersona: state.chatPersona
+            entries: state.entries, goalDetails: state.goalDetails, chatPersona: state.chatPersona,
+            lastExportAt: state.lastExportAt,
+            backupBannerDismissedAt: state.backupBannerDismissedAt
           }
         })
       });
@@ -2351,23 +2376,52 @@ ${notesText || '(기록 없음)'}
     showToast('파일로 다운로드했습니다.');
   }
 
+  function daysSince(isoString) {
+    if (!isoString) return null;
+    const then = new Date(isoString);
+    if (isNaN(then.getTime())) return null;
+    return Math.floor((Date.now() - then.getTime()) / 86400000);
+  }
+
+  function fmtBackupDate(isoString) {
+    if (!isoString) return '';
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '';
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
   function exportData() {
     const payload = {
+      formatVersion: 2,
+      app: 'INSYS',
       exportedAt: new Date().toISOString(),
       people: state.people, goals: state.goals,
       departments: state.departments, personDept: state.personDept,
-      entries: state.entries, goalDetails: state.goalDetails
+      entries: state.entries, goalDetails: state.goalDetails,
+      chatPersona: state.chatPersona,
+      // 회사 공용 설정도 함께 담는다. 예전 버전에서는 이게 빠져 있어서, 백업이 있어도
+      // 회사 비전/조직문화와 리더십 평가요소는 복구할 수 없었다.
+      companySettings: {
+        companyProfile: state.companyProfile || '',
+        evalItems: state.evalItems || [],
+        evalItemDetails: state.evalItemDetails || {}
+      }
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `work-journal-backup-${todayStr()}.json`;
+    a.download = `INSYS_backup_${todayStr()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    showToast('데이터를 파일로 내보냈습니다.');
+
+    state.lastExportAt = new Date().toISOString();
+    state.backupBannerDismissedAt = '';
+    saveData();
+    showToast('백업 파일을 내려받았습니다. 안전한 곳에 보관해주세요.');
+    render();
   }
 
   function handleImportFile(file) {
@@ -2377,17 +2431,25 @@ ${notesText || '(기록 없음)'}
       try {
         const parsed = JSON.parse(e.target.result);
         if (!parsed || typeof parsed !== 'object') throw new Error('invalid');
+        const cs = parsed.companySettings || null;
         state.importPendingData = {
           people: parsed.people || [], goals: parsed.goals || [],
           departments: parsed.departments || [], personDept: parsed.personDept || {},
-          entries: parsed.entries || [], goalDetails: parsed.goalDetails || {}
+          entries: parsed.entries || [], goalDetails: parsed.goalDetails || {},
+          companySettings: cs
         };
+        const isAdminOrHigher = state.myRole === 'admin' || state.myRole === 'account_admin';
         state.importPreview = {
           people: state.importPendingData.people.length,
           goals: state.importPendingData.goals.length,
           departments: state.importPendingData.departments.length,
-          entries: state.importPendingData.entries.length
+          entries: state.importPendingData.entries.length,
+          // 회사 설정은 관리자 이상만 되돌릴 수 있다 (서버가 403으로 막는다).
+          hasCompanySettings: !!cs,
+          canRestoreCompanySettings: !!cs && isAdminOrHigher,
+          evalItems: cs && Array.isArray(cs.evalItems) ? cs.evalItems.length : 0
         };
+        state.importRestoreCompany = !!cs && isAdminOrHigher;
         render();
       } catch (err) {
         state.importError = '파일을 읽을 수 없습니다. 이 앱에서 내보낸 JSON 파일인지 확인해주세요.';
@@ -2397,9 +2459,10 @@ ${notesText || '(기록 없음)'}
     reader.readAsText(file);
   }
 
-  function confirmImportMerge() {
+  async function confirmImportMerge() {
     const d = state.importPendingData;
     if (!d) return;
+    const restoreCompany = state.importRestoreCompany && d.companySettings;
     d.people.forEach(p => { if (!state.people.includes(p)) state.people.push(p); });
     d.goals.forEach(g => { if (!state.goals.includes(g)) state.goals.push(g); });
     d.departments.forEach(dep => { if (!state.departments.includes(dep)) state.departments.push(dep); });
@@ -2412,9 +2475,63 @@ ${notesText || '(기록 없음)'}
     });
     state.importPreview = null;
     state.importPendingData = null;
+    state.importRestoreCompany = false;
     saveData();
-    showToast(`가져오기 완료: 새 기록 ${addedCount}건이 추가되었습니다.`);
+
+    let companyMsg = '';
+    if (restoreCompany) {
+      const cs = d.companySettings;
+      const ok = await saveCompanySettings({
+        companyProfile: cs.companyProfile || '',
+        evalItems: cs.evalItems || [],
+        evalItemDetails: cs.evalItemDetails || {}
+      });
+      if (ok) {
+        state.companyProfile = cs.companyProfile || '';
+        state.evalItems = cs.evalItems || [];
+        state.evalItemDetails = cs.evalItemDetails || {};
+        companyMsg = ' · 회사 비전/평가요소도 복구했습니다';
+      }
+    }
+    showToast(`가져오기 완료: 새 기록 ${addedCount}건 추가${companyMsg}`);
     render();
+  }
+
+  // 마지막으로 백업 파일을 내려받은 지 오래됐으면 화면 맨 위에 알린다.
+  // 서버 자동 백업(볼륨)이 1차 방어선이고, 이 파일 백업은 서버 자체가 사라지는 상황에
+  // 대비한 2차 방어선이다. 둘 중 하나만으로는 부족하다.
+  function renderBackupBanner() {
+    const el = document.getElementById('wj-backup-banner');
+    if (!el) return;
+    if (!state.loaded) { el.innerHTML = ''; return; }
+
+    // 기록이 아직 거의 없으면 굳이 재촉하지 않는다.
+    if (state.entries.length < 3) { el.innerHTML = ''; return; }
+
+    const since = daysSince(state.lastExportAt);
+    const dismissedDays = daysSince(state.backupBannerDismissedAt);
+    if (dismissedDays !== null && dismissedDays < BACKUP_REMIND_DAYS) { el.innerHTML = ''; return; }
+    if (since !== null && since < BACKUP_REMIND_DAYS) { el.innerHTML = ''; return; }
+
+    const urgent = since === null || since >= BACKUP_URGENT_DAYS;
+    const msg = since === null
+      ? `아직 백업 파일을 한 번도 내려받지 않으셨어요. 지금까지 쌓인 기록 <strong>${state.entries.length}건</strong>을 내 PC에도 한 부 보관해두세요.`
+      : `마지막 백업이 <strong>${since}일 전</strong>(${fmtBackupDate(state.lastExportAt)})입니다. 기록 ${state.entries.length}건을 파일로 한 번 더 받아두세요.`;
+
+    el.innerHTML = `<div class="wj-backup-banner${urgent ? ' urgent' : ''}">
+      <div class="wj-backup-banner-text">${msg}</div>
+      <div class="wj-backup-banner-actions">
+        <button class="wj-btn" id="wj-banner-export">지금 백업</button>
+        <button class="wj-btn ghost" id="wj-banner-later">나중에</button>
+      </div>
+    </div>`;
+
+    document.getElementById('wj-banner-export').addEventListener('click', exportData);
+    document.getElementById('wj-banner-later').addEventListener('click', () => {
+      state.backupBannerDismissedAt = new Date().toISOString();
+      saveData();
+      render();
+    });
   }
 
   function renderManageTab() {
@@ -2435,28 +2552,59 @@ ${notesText || '(기록 없음)'}
   }
 
   function renderManageDataTab() {
+    const since = daysSince(state.lastExportAt);
+    const lastText = since === null
+      ? '<span style="color:#b91c1c">아직 백업 파일을 내려받은 적이 없습니다.</span>'
+      : `마지막 백업: <strong>${fmtBackupDate(state.lastExportAt)}</strong> (${since === 0 ? '오늘' : since + '일 전'})`;
+
+    const isAccountAdmin = state.myRole === 'account_admin';
+
     const html = `<div class="wj-card">
-      <h3>데이터 내보내기 / 가져오기</h3>
-      <p class="wj-card-note">다른 기기에서도 같은 데이터를 쓰고 싶다면, 여기서 파일로 내보낸 뒤 다른 기기에서 이 앱을 열어 가져오세요. 가져오기는 기존 데이터에 병합되며, 지우지 않아요. 구성원/부서/업무·목표/전체 기록이 포함돼요. 평가요소와 회사 비전/조직문화는 "관리자 설정"에서 별도로 관리되며, 여기 내보내기/가져오기에는 포함되지 않아요.</p>
+      <h3>백업 · 데이터 내보내기 / 가져오기</h3>
+      <p class="wj-card-note">데이터는 두 겹으로 지킵니다. <strong>서버가 매일 자동으로 사본을 만들고</strong>, 여기서 받는 <strong>파일 백업은 서버 자체에 문제가 생겼을 때를 위한 대비</strong>입니다. 서버 자동 백업만 믿지 마시고, 파일도 가끔 받아서 PC에 보관해주세요. 내보낸 파일에는 구성원·부서·업무/목표·전체 기록에 더해 <strong>회사 비전/조직문화와 리더십 평가요소까지</strong> 함께 담깁니다.</p>
+      <div class="wj-preview" style="margin-bottom:10px">${lastText}</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px">
-        <button class="wj-btn" id="wj-export-btn">데이터 파일로 내보내기</button>
+        <button class="wj-btn" id="wj-export-btn">백업 파일 내려받기</button>
         <button class="wj-btn ghost" id="wj-import-trigger">파일에서 가져오기</button>
         <input type="file" accept="application/json" id="wj-import-input" style="display:none" />
       </div>
       ${state.importError ? `<div class="wj-error-text">${esc(state.importError)}</div>` : ''}
       ${state.importPreview ? `
         <div class="wj-preview">가져올 데이터: 구성원 ${state.importPreview.people}명 · 부서 ${state.importPreview.departments}개 · 업무/목표 ${state.importPreview.goals}개 · 기록 ${state.importPreview.entries}건
-(이미 있는 항목은 중복 추가되지 않고, 기록은 기존 것과 겹치지 않는 것만 더해집니다. 평가요소·회사 비전은 관리자 설정에 속해 있어 여기서는 다루지 않아요.)</div>
+(이미 있는 항목은 중복 추가되지 않고, 기록은 기존 것과 겹치지 않는 것만 더해집니다.)${
+  state.importPreview.hasCompanySettings
+    ? (state.importPreview.canRestoreCompanySettings
+        ? `\n\n이 파일에는 회사 비전/조직문화와 리더십 평가요소 ${state.importPreview.evalItems}개도 들어있습니다. 아래 체크를 켜두면 함께 되돌립니다. (전 직원이 함께 보는 내용이라 현재 값을 덮어씁니다.)`
+        : '\n\n이 파일에는 회사 비전/평가요소도 들어있지만, 관리자 권한이 없어 이 부분은 건너뜁니다.')
+    : ''
+}</div>
+        ${state.importPreview.canRestoreCompanySettings ? `
+        <label style="display:flex; align-items:center; gap:7px; margin-bottom:10px; font-size:13px; cursor:pointer">
+          <input type="checkbox" id="wj-import-company" ${state.importRestoreCompany ? 'checked' : ''} />
+          회사 비전/조직문화와 리더십 평가요소도 함께 되돌리기
+        </label>` : ''}
         <div style="display:flex; gap:8px">
           <button class="wj-btn secondary" id="wj-import-confirm">병합해서 가져오기</button>
           <button class="wj-btn ghost" id="wj-import-cancel">취소</button>
         </div>
       ` : ''}
-    </div>`;
+    </div>
+    ${isAccountAdmin ? `<div class="wj-card" id="wj-server-backup-card">
+      <h3>서버 자동 백업 현황</h3>
+      <p class="wj-card-note">서버가 매일 한 번 데이터베이스 사본을 만들어 보관합니다. 이 사본은 재배포해도 지워지지 않는 저장 공간(볼륨) 안에 있습니다. 계정관리자만 볼 수 있는 정보입니다.</p>
+      <div id="wj-backup-list"><div class="wj-empty">불러오는 중...</div></div>
+      <div style="margin-top:10px"><button class="wj-btn ghost small" id="wj-backup-run">지금 한 번 백업하기</button></div>
+    </div>` : ''}`;
 
     document.getElementById('wj-manage-body').innerHTML = html;
 
+    if (isAccountAdmin) loadBackupStatus();
+
     document.getElementById('wj-export-btn').addEventListener('click', exportData);
+    const importCompanyChk = document.getElementById('wj-import-company');
+    if (importCompanyChk) importCompanyChk.addEventListener('change', (e) => {
+      state.importRestoreCompany = e.target.checked;
+    });
     document.getElementById('wj-import-trigger').addEventListener('click', () => {
       document.getElementById('wj-import-input').click();
     });
@@ -2469,8 +2617,52 @@ ${notesText || '(기록 없음)'}
     if (importConfirmBtn) importConfirmBtn.addEventListener('click', confirmImportMerge);
     const importCancelBtn = document.getElementById('wj-import-cancel');
     if (importCancelBtn) importCancelBtn.addEventListener('click', () => {
-      state.importPreview = null; state.importPendingData = null; render();
+      state.importPreview = null; state.importPendingData = null;
+      state.importRestoreCompany = false; render();
     });
+
+    const backupRunBtn = document.getElementById('wj-backup-run');
+    if (backupRunBtn) backupRunBtn.addEventListener('click', async () => {
+      backupRunBtn.disabled = true;
+      backupRunBtn.textContent = '백업 중...';
+      try {
+        const res = await fetch('/api/admin/backups/run', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.detail || '백업에 실패했습니다.'); }
+        else { showToast('서버 백업을 만들었습니다.'); state.backupInfo = null; }
+      } catch (e) { showToast('백업 요청에 실패했습니다.'); }
+      loadBackupStatus();
+      backupRunBtn.disabled = false;
+      backupRunBtn.textContent = '지금 한 번 백업하기';
+    });
+  }
+
+  function fmtBytes(n) {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+    return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  async function loadBackupStatus() {
+    const box = document.getElementById('wj-backup-list');
+    if (!box) return;
+    try {
+      const res = await fetch('/api/admin/backups');
+      if (!res.ok) { box.innerHTML = `<div class="wj-empty">백업 정보를 불러올 수 없습니다.</div>`; return; }
+      const data = await res.json();
+      const list = data.backups || [];
+      if (!list.length) {
+        box.innerHTML = `<div class="wj-empty">아직 만들어진 백업이 없습니다. 서버가 시작되면 곧 첫 백업이 생성됩니다.</div>`;
+        return;
+      }
+      const rows = list.map(b => `<div class="wj-manage-row">
+        <span>${esc(b.name.replace(/^app-/, '').replace(/\.db$/, ''))}</span>
+        <span class="wj-count-badge">${fmtBytes(b.sizeBytes)}</span>
+      </div>`).join('');
+      box.innerHTML = `<div class="wj-card-note" style="margin-bottom:6px">보관 위치 ${esc(data.backupDir)} · 최근 ${data.keep}개 보관 · ${data.intervalHours}시간마다 실행</div>${rows}`;
+    } catch (e) {
+      box.innerHTML = `<div class="wj-empty">백업 정보를 불러올 수 없습니다.</div>`;
+    }
   }
 
   const ACCESS_LEVEL_LABEL = { account_admin: '계정관리자', admin: '관리자', member: '일반사용자' };
@@ -2505,9 +2697,16 @@ ${notesText || '(기록 없음)'}
               <option value="account_admin" ${u.access_level==='account_admin'?'selected':''}>계정관리자</option>
             </select>
             ${!isMe ? `<button class="wj-btn ghost small" data-reset-pw="${u.id}" data-reset-pw-email="${esc(u.email)}">비밀번호 초기화</button>` : ''}
-            ${!isMe ? `<button class="wj-btn danger-ghost" data-remove-user="${u.id}">내보내기</button>` : ''}
+            ${!isMe ? (
+              state.confirmRemoveUser === u.id
+                ? `<button class="wj-btn danger-ghost" data-remove-user-confirm="${u.id}">정말 삭제</button>
+                   <button class="wj-btn ghost small" data-remove-user-cancel="1">취소</button>`
+                : `<button class="wj-btn danger-ghost" data-remove-user="${u.id}">내보내기</button>`
+            ) : ''}
           </div>
-        </div>`;
+        </div>${state.confirmRemoveUser === u.id ? `<div class="wj-preview" style="margin:-4px 0 10px; border-color:#fca5a5; background:#fef2f2">
+          <b>${esc(u.email)}</b> 계정을 삭제합니다. 이 사람이 쌓아둔 업무 기록·목표·구성원 메모가 <b>전부 함께 지워지며 되돌릴 수 없습니다.</b> 퇴사자 계정 정리가 맞는지 확인 후 진행해주세요.
+        </div>` : ''}`;
       }).join('')}
     </div>
 
@@ -2545,15 +2744,30 @@ ${notesText || '(기록 없음)'}
         renderTeamAccessTab();
       });
     });
+    // 1단계: 확인 문구를 펼치기만 한다 (여기서는 아무것도 삭제되지 않음)
     document.querySelectorAll('[data-remove-user]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.confirmRemoveUser = parseInt(btn.dataset.removeUser, 10);
+        renderTeamAccessTab();
+      });
+    });
+    document.querySelectorAll('[data-remove-user-cancel]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.confirmRemoveUser = null;
+        renderTeamAccessTab();
+      });
+    });
+    // 2단계: 실제 삭제
+    document.querySelectorAll('[data-remove-user-confirm]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const res = await fetch('/api/access/remove', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetUserId: parseInt(btn.dataset.removeUser, 10) })
+          body: JSON.stringify({ targetUserId: parseInt(btn.dataset.removeUserConfirm, 10) })
         });
         const data = await res.json();
-        if (!res.ok) { showToast(data.detail || '내보내기에 실패했습니다.'); return; }
-        showToast('팀원을 내보냈습니다.');
+        state.confirmRemoveUser = null;
+        if (!res.ok) { showToast(data.detail || '내보내기에 실패했습니다.'); renderTeamAccessTab(); return; }
+        showToast('팀원 계정을 삭제했습니다.');
         renderTeamAccessTab();
       });
     });
@@ -2904,6 +3118,7 @@ ${notesText || '(기록 없음)'}
     const isAdminOrHigher = state.myRole === 'admin' || state.myRole === 'account_admin';
     if (state.tab === 'admin' && !isAdminOrHigher) state.tab = 'manage';
     renderTabs();
+    renderBackupBanner();
     if (!state.loaded) {
       document.getElementById('wj-content').innerHTML = `<div class="wj-empty">불러오는 중...</div>`;
       return;
