@@ -404,6 +404,10 @@
       <label class="wj-auth-label">새 비밀번호 (6자 이상)</label>
       <input type="password" class="wj-auth-input" id="wj-changepw-new" />
     </div>
+    <div class="wj-field">
+      <label class="wj-auth-label">새 비밀번호 확인</label>
+      <input type="password" class="wj-auth-input" id="wj-changepw-confirm" />
+    </div>
     <button class="wj-auth-btn" id="wj-changepw-submit">변경하기</button>
     <div class="wj-auth-error" id="wj-changepw-error" style="display:none"></div>
     <div class="wj-auth-notice" id="wj-changepw-notice" style="display:none"></div>
@@ -3158,6 +3162,7 @@ ${notesText || '(기록 없음)'}
   const changePwSubmit = document.getElementById('wj-changepw-submit');
   const changePwCurrent = document.getElementById('wj-changepw-current');
   const changePwNew = document.getElementById('wj-changepw-new');
+  const changePwConfirm = document.getElementById('wj-changepw-confirm');
   const changePwError = document.getElementById('wj-changepw-error');
   const changePwNotice = document.getElementById('wj-changepw-notice');
 
@@ -3259,29 +3264,61 @@ ${notesText || '(기록 없음)'}
   function openChangePwModal() {
     changePwCurrent.value = '';
     changePwNew.value = '';
+    changePwConfirm.value = '';
+    changePwSubmit.disabled = false;
+    changePwSubmit.textContent = '변경하기';
     changePwError.style.display = 'none';
     changePwNotice.style.display = 'none';
     changePwOverlay.style.display = 'flex';
+    changePwCurrent.focus();
   }
   function closeChangePwModal() {
     changePwOverlay.style.display = 'none';
+    // 비밀번호가 입력칸에 남아있지 않도록 비운다.
+    changePwCurrent.value = '';
+    changePwNew.value = '';
+    changePwConfirm.value = '';
   }
   changePwBtn.addEventListener('click', openChangePwModal);
   changePwClose.addEventListener('click', closeChangePwModal);
   changePwOverlay.addEventListener('click', (e) => {
     if (e.target === changePwOverlay) closeChangePwModal();
   });
+  // 엔터키: 현재/새 비밀번호에서는 다음 칸으로, 확인칸에서는 바로 제출
+  changePwCurrent.addEventListener('keydown', (e) => { if (e.key === 'Enter') changePwNew.focus(); });
+  changePwNew.addEventListener('keydown', (e) => { if (e.key === 'Enter') changePwConfirm.focus(); });
+  changePwConfirm.addEventListener('keydown', (e) => { if (e.key === 'Enter') changePwSubmit.click(); });
   changePwSubmit.addEventListener('click', async () => {
     changePwError.style.display = 'none';
     changePwNotice.style.display = 'none';
     const currentPassword = changePwCurrent.value;
     const newPassword = changePwNew.value;
-    if (!currentPassword || !newPassword) {
-      changePwError.textContent = '현재 비밀번호와 새 비밀번호를 모두 입력해주세요.';
+    const confirmPassword = changePwConfirm.value;
+
+    const fail = (msg, focusEl) => {
+      changePwError.textContent = msg;
       changePwError.style.display = 'block';
-      return;
+      if (focusEl) focusEl.focus();
+    };
+
+    // 서버에 보내기 전에 화면에서 먼저 걸러낸다.
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return fail('현재 비밀번호와 새 비밀번호를 모두 입력해주세요.', !currentPassword ? changePwCurrent : (!newPassword ? changePwNew : changePwConfirm));
     }
+    if (newPassword.length < 6) {
+      return fail('새 비밀번호는 6자 이상이어야 합니다.', changePwNew);
+    }
+    if (newPassword !== confirmPassword) {
+      // 오타를 그대로 저장해버리면 다음 로그인부터 못 들어가게 되므로 여기서 막는다.
+      changePwConfirm.value = '';
+      return fail('새 비밀번호가 서로 다릅니다. 다시 입력해주세요.', changePwConfirm);
+    }
+    if (newPassword === currentPassword) {
+      return fail('현재 비밀번호와 다른 비밀번호를 입력해주세요.', changePwNew);
+    }
+
     changePwSubmit.disabled = true;
+    changePwSubmit.textContent = '변경 중...';
     try {
       const res = await fetch('/api/auth/change-password', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -3289,19 +3326,22 @@ ${notesText || '(기록 없음)'}
       });
       const data = await res.json();
       if (!res.ok) {
-        changePwError.textContent = data.detail || '변경에 실패했습니다.';
-        changePwError.style.display = 'block';
-        return;
+        changePwSubmit.disabled = false;
+        changePwSubmit.textContent = '변경하기';
+        return fail(data.detail || '변경에 실패했습니다.', changePwCurrent);
       }
       changePwNotice.textContent = '비밀번호가 변경되었습니다.';
       changePwNotice.style.display = 'block';
       changePwCurrent.value = '';
       changePwNew.value = '';
+      changePwConfirm.value = '';
+      changePwSubmit.textContent = '완료';
+      // 성공 안내를 잠깐 보여준 뒤 창을 닫는다.
+      setTimeout(closeChangePwModal, 1500);
     } catch (e) {
-      changePwError.textContent = '네트워크 오류가 발생했습니다.';
-      changePwError.style.display = 'block';
-    } finally {
       changePwSubmit.disabled = false;
+      changePwSubmit.textContent = '변경하기';
+      fail('네트워크 오류가 발생했습니다.', null);
     }
   });
 
