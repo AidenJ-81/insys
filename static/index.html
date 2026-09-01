@@ -588,6 +588,23 @@
   const BACKUP_REMIND_DAYS = 7;
   const BACKUP_URGENT_DAYS = 21;
 
+  // 어느 MBO 목표에도 속하지 않는 업무를 모아두는 고정 분류.
+  // 목록에서 항상 맨 끝에 오도록 유지한다 (실제 MBO 목표들 사이에 섞이면 헷갈린다).
+  const OTHER_GOAL = 'MBO외 업무';
+
+  function ensureOtherGoalLast() {
+    const i = state.goals.indexOf(OTHER_GOAL);
+    if (i === -1 || i === state.goals.length - 1) return;
+    state.goals.splice(i, 1);
+    state.goals.push(OTHER_GOAL);
+  }
+
+  // 목표 목록을 바꾼 뒤에는 항상 이걸 통해 정렬을 맞춘다.
+  function addGoal(name) {
+    if (!state.goals.includes(name)) state.goals.push(name);
+    ensureOtherGoalLast();
+  }
+
   const STORAGE_KEY = 'work-journal-data';
 
   async function loadData() {
@@ -597,6 +614,7 @@
         const parsed = await res.json();
         state.people = parsed.people || [];
         state.goals = parsed.goals || [];
+        ensureOtherGoalLast();
         state.departments = parsed.departments || [];
         state.personDept = parsed.personDept || {};
         state.entries = parsed.entries || [];
@@ -1005,7 +1023,7 @@
       tag = (state.formNewTag || '').trim();
       if (!tag) { showToast('이름을 입력해주세요.'); return; }
       if (state.formType === 'person' && !state.people.includes(tag)) state.people.push(tag);
-      if (state.formType === 'work' && !state.goals.includes(tag)) state.goals.push(tag);
+      if (state.formType === 'work') addGoal(tag);
     }
     if (!tag) { showToast('사람 또는 업무를 선택해주세요.'); return; }
     if (!state.formContent || !state.formContent.trim()) { showToast('내용을 입력해주세요.'); return; }
@@ -1441,7 +1459,7 @@
     if (!p.content || !p.content.trim()) { showToast('내용을 입력해주세요.'); return; }
 
     if (p.type === 'person' && !state.people.includes(tag)) state.people.push(tag);
-    if (p.type === 'work' && !state.goals.includes(tag)) state.goals.push(tag);
+    if (p.type === 'work') addGoal(tag);
 
     const approvedRelated = (p.relatedGoals || []).filter(rg => rg.approved && rg.goal !== tag).map(rg => rg.goal);
 
@@ -1582,7 +1600,7 @@ ${recentChat}
 되물을 때 지침:
 - 한 번에 질문 1~2개만 하세요. 취조하듯 여러 개를 나열하지 마세요.
 - 막연히 "더 자세히 알려주세요"라고 하지 말고, 후보를 제시하세요. 예: "이건 [범용AI 도입 및 정착] 목표에 넣을까요, 아니면 [AI 관련 지식 전파활동] 쪽에 더 가까울까요?"
-- 목표가 애매하면 목표 설명을 근거로 가장 가능성 높은 후보 1~2개를 먼저 제안하고 확인받으세요.
+- 목표가 애매하면 목표 설명을 근거로 가장 가능성 높은 후보 1~2개를 먼저 제안하고 확인받으세요. 사용자가 제시한 후보를 모두 아니라고 하면, 그때 "새 목표로 만들까요, 아니면 ${OTHER_GOAL}로 둘까요?"라고 다시 물으세요.
 - 이전 대화에서 이미 확인한 내용은 다시 묻지 마세요. [최근 대화]를 참고해서 답변이 이미 나왔으면 바로 반영하세요.
 - 사용자가 답하면, 그 답을 반영해서 충분히 명확해졌는지 다시 판단하세요. 명확해졌다면 그때 entries를 채우세요.
 - 이미 충분히 구체적인 메시지(대상, 내용, 목표가 다 명확함)라면 되묻지 말고 바로 entries를 채우세요. 매번 되물을 필요는 없습니다.
@@ -1590,7 +1608,10 @@ ${recentChat}
 entries를 채울 때:
 1. 사용자 메시지(및 이전 대화에서 확인된 내용)에서 기록 항목을 만드세요. 서로 다른 목표나 서로 다른 대상(협업 인물)에 해당하는 내용만 별도 항목으로 분리하세요. 같은 목표/대상에 대한 세부 내용(경과, 결과, 배경 설명 등)은 억지로 쪼개지 말고 하나의 항목으로 자연스럽게 합쳐서 정리하세요. 꼭 필요한 경우가 아니면 한 메시지당 1~2개 항목이 자연스럽습니다.
 2. 각 항목의 type을 판단하세요: 특정 동료/팀원과의 협업·관찰이면 "person", 본인이 수행한 업무/과제면 "work".
-3. type이 "work"인 경우, 위 목표 목록과 비교해서 가장 잘 맞는 기존 목표를 tag로 고르세요. 각 목표의 "포함되는 활동 예시"가 작성되어 있다면 그것을 "설명"보다 우선적인 근거로 삼으세요 (그 경계 정의는 사용자가 직접 정해둔 것이라 가장 정확합니다). 그래도 애매하면 앞서 말한 대로 되물으세요. 맞는 게 없으면 새 이름을 만드세요.
+3. type이 "work"인 경우, 위 목표 목록과 비교해서 가장 잘 맞는 기존 목표를 tag로 고르세요. 각 목표의 "포함되는 활동 예시"가 작성되어 있다면 그것을 "설명"보다 우선적인 근거로 삼으세요 (그 경계 정의는 사용자가 직접 정해둔 것이라 가장 정확합니다). 그래도 애매하면 앞서 말한 대로 후보를 제시하며 되물으세요.
+3-1. **어느 기존 목표에도 맞지 않는다고 판단되면, 절대 새 목표 이름을 임의로 지어내지 마세요.** 대신 entries를 빈 배열로 두고, reply에서 두 가지 선택지를 제시해 반드시 되물으세요: (가) 새 MBO 목표로 등록할지, (나) "${OTHER_GOAL}"로 둘지. 예: "이건 지금 등록된 목표 중에는 해당하는 게 없는 것 같아요. 새 목표로 만들까요, 아니면 ${OTHER_GOAL}로 둘까요?"
+3-2. 사용자가 "${OTHER_GOAL}로 해줘", "그냥 목표 외로", "새로 안 만들어도 돼" 같은 뜻으로 답하면 tag를 정확히 "${OTHER_GOAL}"로 지정하세요. 사용자가 새 목표를 만들겠다고 하면 그때 사용자가 말한 이름(또는 사용자가 승인한 이름)을 tag로 쓰세요.
+3-3. 이미 목표 목록에 "${OTHER_GOAL}"가 있고 사용자가 이전에 비슷한 성격의 업무를 거기 넣었다면, 굳이 매번 되묻지 말고 "${OTHER_GOAL}"로 분류한 뒤 reply에서 가볍게 확인만 하세요.
 4. type과 무관하게(업무든 협업이든), 이 내용이 위 목표 목록 중 어느 하나의 실제성과 근거가 될 수 있는지 목표 설명과 최근 기록 예시를 근거로 판단하세요. type이 "work"라면 주 목표(tag) 외의 다른 목표도 확인하고, type이 "person"이라면 이 협업 활동 자체가 어떤 목표의 성과 증거가 될 수 있는지 확인하세요 (예: "동료 설득해 A 도입 결정"은 "A 도입" 목표의 증거가 될 수 있음). 근거가 빈약하면 relatedGoals를 빈 배열로 두세요. 절대 억지로 만들지 마세요.
 5. relatedGoals의 각 항목에는 goal(목표명), reason(한 문장 근거), confidence("high"|"medium"|"low")를 포함하세요.
 6. type이 "person"인 경우 tag는 위 협업 대상 목록에서 고르거나, 목록에 없으면 대화에서 언급된 이름을 쓰세요. 이름이 불명확하면 "미지정"으로 두세요. 협업 대상 목록에는 이름 옆에 부서가 괄호로 표시되어 있습니다. 사용자가 성을 뺀 이름으로 사람을 언급하면 표기 형태에 따라 확신 정도가 다릅니다:
@@ -1786,7 +1807,7 @@ reply 필드:
 
   function renderGoalSettingSubTab() {
     const container = document.getElementById('wj-manage-body');
-    const totalWeight = state.goals.reduce((sum, g) => sum + (parseFloat((state.goalDetails[g]||{}).weight) || 0), 0);
+    const totalWeight = state.goals.filter(g => g !== OTHER_GOAL).reduce((sum, g) => sum + (parseFloat((state.goalDetails[g]||{}).weight) || 0), 0);
 
     let html = `<div class="wj-card">
       <span class="wj-field-label-hint">MBO 목표 &gt; 목표입력 화면에 붙여넣기</span>
@@ -1798,11 +1819,13 @@ reply 필드:
       </div>
     </div>`;
 
+    const mboGoals = state.goals.filter(g => g !== OTHER_GOAL);
+    const hasOtherGoal = state.goals.includes(OTHER_GOAL);
     if (state.goals.length > 0) {
       html += `<div class="wj-card">
         <h3>전체 목표 미리보기</h3>
-        <p class="wj-card-note">지금까지 작성한 목표들을 이미지1 화면 순서대로 모았습니다. 그대로 복사해서 목표입력 화면에 하나씩 옮기시면 됩니다.</p>
-        ${state.goals.map((g, i) => {
+        <p class="wj-card-note">지금까지 작성한 목표들을 이미지1 화면 순서대로 모았습니다. 그대로 복사해서 목표입력 화면에 하나씩 옮기시면 됩니다.${hasOtherGoal ? ` "${OTHER_GOAL}"는 회사 MBO 목표가 아니라 분류용이므로 아래 번호 목록과 복사 내용에서 제외됩니다.` : ''}</p>
+        ${mboGoals.map((g, i) => {
           const d = state.goalDetails[g] || {};
           const block = `${i+1}. ${g}\n[달성방안/목표수준]\n${d.description || '(미작성)'}\n[기간] ${d.periodStart || '?'} ~ ${d.periodEnd || '?'}\n[가중치] ${d.weight || 0}%`;
           const confirming = state.gsConfirmDelete === g;
@@ -1820,6 +1843,17 @@ reply 필드:
           </div>
             ${d.scopeNotes ? `<div class="wj-card-note" style="margin:4px 0 12px">↳ 포함되는 활동 예시 (회사 시스템엔 붙여넣지 않는, AI 분류 참고용): ${esc(d.scopeNotes)}</div>` : ''}`;
         }).join('')}
+        ${hasOtherGoal ? `<div class="wj-manage-row" style="align-items:flex-start">
+          <div class="wj-preview" style="margin-bottom:0; flex:1; background:#f8fafc">${esc(OTHER_GOAL)}
+어느 MBO 목표에도 해당하지 않는 업무를 모아두는 칸입니다. 연말에 "목표 외 기여"로 정리할 때 쓰세요.
+[기록 수] ${state.entries.filter(e => e.type === 'work' && e.tag === OTHER_GOAL).length}건</div>
+          <div style="display:flex; flex-direction:column; gap:6px; margin-left:10px; align-items:stretch">
+            ${state.gsConfirmDelete === OTHER_GOAL ? `
+              <button class="wj-btn small" style="background:var(--danger)" data-gs-confirm-delete="${esc(OTHER_GOAL)}">삭제 확인</button>
+              <button class="wj-btn ghost small" data-gs-cancel-delete="1">취소</button>
+            ` : `<button class="wj-btn danger-ghost" data-gs-ask-delete="${esc(OTHER_GOAL)}">삭제</button>`}
+          </div>
+        </div>` : ''}
         <button class="wj-btn secondary" id="wj-gs-copy-all">전체 목표 복사</button>
       </div>`;
     }
@@ -1907,7 +1941,7 @@ reply 필드:
     const copyAllBtn = document.getElementById('wj-gs-copy-all');
     if (copyAllBtn) {
       copyAllBtn.addEventListener('click', () => {
-        const full = state.goals.map((g, i) => {
+        const full = state.goals.filter(g => g !== OTHER_GOAL).map((g, i) => {
           const d = state.goalDetails[g] || {};
           return `${i+1}. ${g}\n[달성방안/목표수준]\n${d.description || '(미작성)'}\n[기간] ${d.periodStart || '?'} ~ ${d.periodEnd || '?'}\n[가중치] ${d.weight || 0}%`;
         }).join('\n\n');
@@ -1929,7 +1963,7 @@ reply 필드:
         const newNameInput = document.getElementById('wj-gs-newname');
         goalName = (newNameInput.value || '').trim();
         if (!goalName) { showToast('목표 이름을 입력해주세요.'); return; }
-        if (!state.goals.includes(goalName)) state.goals.push(goalName);
+        addGoal(goalName);
       }
       state.goalDetails[goalName] = {
         description: state.gsDesc, scopeNotes: state.gsScopeNotes, periodStart: state.gsPeriodStart,
@@ -2469,6 +2503,7 @@ ${notesText || '(기록 없음)'}
     const restoreCompany = state.importRestoreCompany && d.companySettings;
     d.people.forEach(p => { if (!state.people.includes(p)) state.people.push(p); });
     d.goals.forEach(g => { if (!state.goals.includes(g)) state.goals.push(g); });
+    ensureOtherGoalLast();
     d.departments.forEach(dep => { if (!state.departments.includes(dep)) state.departments.push(dep); });
     Object.assign(state.personDept, d.personDept);
     Object.assign(state.goalDetails, d.goalDetails);
