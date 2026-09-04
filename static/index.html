@@ -206,6 +206,7 @@
   .wj-chat-input-row textarea { flex: 1; min-height: 48px; resize: none; }
 
   .wj-pending-card { border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 12px; background: var(--bg); }
+  .wj-pending-card.blocked { border-color: #fca5a5; background: #fef2f2; }
   .wj-pending-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
   .wj-confidence-badge { font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 100px; }
   .wj-confidence-badge.high { background: #DDEEE0; color: #2F7A44; }
@@ -549,7 +550,7 @@
   let state = {
     tab: 'manage',
     people: [], goals: [], evalItems: [], evalItemDetails: {}, entries: [],
-    departments: [], personDept: {},
+    departments: [], personDept: {}, personRole: {},
     editingDept: null, editingDeptValue: '',
     editingPerson: null, editingPersonValue: '',
     importPreview: null, importPendingData: null, importError: '', importRestoreCompany: false,
@@ -617,6 +618,7 @@
         ensureOtherGoalLast();
         state.departments = parsed.departments || [];
         state.personDept = parsed.personDept || {};
+        state.personRole = parsed.personRole || {};
         state.entries = parsed.entries || [];
         state.entries.forEach(e => {
           if (!e.dateStart) {
@@ -645,7 +647,7 @@
         body: JSON.stringify({
           data: {
             people: state.people, goals: state.goals,
-            departments: state.departments, personDept: state.personDept,
+            departments: state.departments, personDept: state.personDept, personRole: state.personRole, personRole: state.personRole,
             entries: state.entries, goalDetails: state.goalDetails, chatPersona: state.chatPersona,
             lastExportAt: state.lastExportAt,
             backupBannerDismissedAt: state.backupBannerDismissedAt
@@ -1317,14 +1319,22 @@
 
     const saveAllBtn = document.getElementById('wj-pending-save-all');
     if (saveAllBtn) saveAllBtn.addEventListener('click', () => {
-      let count = 0;
-      while (state.chatPending.length > 0) {
-        const before = state.chatPending.length;
-        commitPendingEntry(0);
-        if (state.chatPending.length === before) break;
-        count++;
+      // 예전에는 앞쪽 항목 하나가 저장에 실패하면 반복문 자체가 멈춰서
+      // 뒤에 있는 멀쩡한 항목들까지 저장되지 않았다. 이제는 건너뛰고 계속 진행한다.
+      let saved = 0;
+      for (let i = state.chatPending.length - 1; i >= 0; i--) {
+        if (commitPendingEntry(i, true)) saved++;
       }
-      showToast(`${count}건이 저장되었습니다.`);
+      const left = state.chatPending.length;
+      if (saved > 0) saveData();
+      renderChatSubTab();
+      if (saved === 0 && left > 0) {
+        showToast('저장할 수 없습니다. 대상 이름과 내용을 채워주세요.');
+      } else if (left > 0) {
+        showToast(`${saved}건 저장했습니다. ${left}건은 대상 이름이나 내용이 비어 있어 남겨뒀어요.`);
+      } else {
+        showToast(`${saved}건이 저장되었습니다.`);
+      }
     });
     const discardAllBtn = document.getElementById('wj-pending-discard-all');
     if (discardAllBtn) discardAllBtn.addEventListener('click', () => {
@@ -1337,7 +1347,9 @@
 
   function renderPendingCard(p, idx) {
     const tagList = p.type === 'person' ? state.people : state.goals;
-    return `<div class="wj-pending-card" data-pending-idx="${idx}">
+    const blocked = !(p.tag || '').trim() || !(p.content || '').trim();
+    return `<div class="wj-pending-card${blocked ? ' blocked' : ''}" data-pending-idx="${idx}">
+      ${blocked ? `<div class="wj-card-note" style="color:#b91c1c; margin-bottom:8px">${!(p.tag || '').trim() ? '대상/업무 이름이 비어 있어요.' : '내용이 비어 있어요.'} 채워야 저장됩니다.</div>` : ''}
       <div class="wj-pending-head">
         <div class="wj-type-toggle" style="flex:0 0 auto; gap:6px;">
           <button class="wj-type-btn ${p.type==='work'?'sel-work':''}" style="flex:none;padding:6px 12px" data-pf="type" data-val="work" data-idx="${idx}">내 업무</button>
@@ -1452,11 +1464,14 @@
     });
   }
 
-  function commitPendingEntry(idx) {
+  // silent=true면 개별 토스트와 화면 다시 그리기를 생략한다 (전체 저장에서 사용).
+  // 반환값: 저장 성공 여부. 실패하면 그 항목은 목록에 그대로 남는다.
+  function commitPendingEntry(idx, silent) {
     const p = state.chatPending[idx];
+    if (!p) return false;
     const tag = (p.tag || '').trim();
-    if (!tag) { showToast('협업 대상 또는 업무 이름을 입력해주세요.'); return; }
-    if (!p.content || !p.content.trim()) { showToast('내용을 입력해주세요.'); return; }
+    if (!tag) { if (!silent) showToast('협업 대상 또는 업무 이름을 입력해주세요.'); return false; }
+    if (!p.content || !p.content.trim()) { if (!silent) showToast('내용을 입력해주세요.'); return false; }
 
     if (p.type === 'person' && !state.people.includes(tag)) state.people.push(tag);
     if (p.type === 'work') addGoal(tag);
@@ -1496,9 +1511,12 @@
     }
 
     state.chatPending.splice(idx, 1);
-    saveData();
-    showToast('기록이 저장되었습니다.' + completedMsg);
-    renderChatSubTab();
+    if (!silent) {
+      saveData();
+      showToast('기록이 저장되었습니다.' + completedMsg);
+      renderChatSubTab();
+    }
+    return true;
   }
 
   async function sendChatMessage() {
@@ -1554,7 +1572,10 @@
           }).join('\n')
         : '(등록된 목표 없음)';
       const peopleContext = state.people.length > 0
-        ? state.people.map(p => `${forward[p]}${state.personDept[p] ? ` (${state.personDept[p]})` : ''}`).join(', ')
+        ? state.people.map(p => {
+            const meta = [state.personDept[p], state.personRole[p]].filter(Boolean).join(' / ');
+            return `${forward[p]}${meta ? ` (${meta})` : ''}`;
+          }).join(', ')
         : '(등록된 협업 대상 없음)';
       const confirmedCasualContext = state.confirmedCasualNames.length > 0
         ? state.confirmedCasualNames.map(p => forward[p]).join(', ')
@@ -1615,12 +1636,17 @@ entries를 채울 때:
 1. 사용자 메시지(및 이전 대화에서 확인된 내용)에서 기록 항목을 만드세요. 서로 다른 목표나 서로 다른 대상(협업 인물)에 해당하는 내용만 별도 항목으로 분리하세요. 같은 목표/대상에 대한 세부 내용(경과, 결과, 배경 설명 등)은 억지로 쪼개지 말고 하나의 항목으로 자연스럽게 합쳐서 정리하세요. 꼭 필요한 경우가 아니면 한 메시지당 1~2개 항목이 자연스럽습니다.
 2. 각 항목의 type을 판단하세요: 특정 동료/팀원과의 협업·관찰이면 "person", 본인이 수행한 업무/과제면 "work".
 3. type이 "work"인 경우, 위 목표 목록과 비교해서 가장 잘 맞는 기존 목표를 tag로 고르세요. 각 목표의 "포함되는 활동 예시"가 작성되어 있다면 그것을 "설명"보다 우선적인 근거로 삼으세요 (그 경계 정의는 사용자가 직접 정해둔 것이라 가장 정확합니다). 그래도 애매하면 앞서 말한 대로 후보를 제시하며 되물으세요.
-3-1. **어느 기존 목표에도 맞지 않는다고 판단되면, 절대 새 목표 이름을 임의로 지어내지 마세요.** 대신 entries를 빈 배열로 두고, reply에서 두 가지 선택지를 제시해 반드시 되물으세요: (가) 새 MBO 목표로 등록할지, (나) "${OTHER_GOAL}"로 둘지. 예: "이건 지금 등록된 목표 중에는 해당하는 게 없는 것 같아요. 새 목표로 만들까요, 아니면 ${OTHER_GOAL}로 둘까요?"
+3-0. **주 목표(tag)를 혼자 정하지 말아야 하는 경우가 있습니다.** 아래 4번에서 판단한 relatedGoals에 confidence가 "high" 또는 "medium"인 목표가 **2개 이상** 나온다면, 그건 이 업무가 어느 목표에 속하는지 당신도 확신하지 못한다는 뜻입니다. 이 경우 **entries를 빈 배열로 두고**, reply에서 그 목표들을 후보로 제시해 반드시 되물으세요. 예: "이건 [특화 AI 프로젝트 수행] 쪽일까요, 아니면 [시스템 관련 업무개선 활동] 쪽에 더 가까울까요?" 사용자가 답한 뒤에 그 목표를 tag로 써서 entries를 만드세요. 스스로 "이게 더 맞겠지"라고 판단해서 그냥 넣지 마세요 — 목표 분류는 연말 평가에 직결되므로 사용자가 정해야 합니다. **단, [최근 대화]에서 이미 이 건의 목표를 물었고 사용자가 답했다면 다시 묻지 말고 그 답을 tag로 쓰세요.** 또한 [지금 화면에 제안된 상태로 떠 있는 기록]에 이미 같은 일이 특정 목표로 올라와 있다면, 그 목표가 사용자에게 확인된 것으로 보고 다시 묻지 마세요.
+3-1. 어느 기존 목표에도 맞지 않는다고 판단되면, **절대 새 목표 이름을 임의로 지어내지 마세요.** 대신 entries를 빈 배열로 두고, reply에서 두 가지 선택지를 제시해 반드시 되물으세요: (가) 새 MBO 목표로 등록할지, (나) "${OTHER_GOAL}"로 둘지. 예: "이건 지금 등록된 목표 중에는 해당하는 게 없는 것 같아요. 새 목표로 만들까요, 아니면 ${OTHER_GOAL}로 둘까요?"
 3-2. 사용자가 "${OTHER_GOAL}로 해줘", "그냥 목표 외로", "새로 안 만들어도 돼" 같은 뜻으로 답하면 tag를 정확히 "${OTHER_GOAL}"로 지정하세요. 사용자가 새 목표를 만들겠다고 하면 그때 사용자가 말한 이름(또는 사용자가 승인한 이름)을 tag로 쓰세요.
 3-3. 이미 목표 목록에 "${OTHER_GOAL}"가 있고 사용자가 이전에 비슷한 성격의 업무를 거기 넣었다면, 굳이 매번 되묻지 말고 "${OTHER_GOAL}"로 분류한 뒤 reply에서 가볍게 확인만 하세요.
 4. type과 무관하게(업무든 협업이든), 이 내용이 위 목표 목록 중 어느 하나의 실제성과 근거가 될 수 있는지 목표 설명과 최근 기록 예시를 근거로 판단하세요. type이 "work"라면 주 목표(tag) 외의 다른 목표도 확인하고, type이 "person"이라면 이 협업 활동 자체가 어떤 목표의 성과 증거가 될 수 있는지 확인하세요 (예: "동료 설득해 A 도입 결정"은 "A 도입" 목표의 증거가 될 수 있음). 근거가 빈약하면 relatedGoals를 빈 배열로 두세요. 절대 억지로 만들지 마세요.
 5. relatedGoals의 각 항목에는 goal(목표명), reason(한 문장 근거), confidence("high"|"medium"|"low")를 포함하세요.
-6. type이 "person"인 경우 tag는 위 협업 대상 목록에서 고르거나, 목록에 없으면 대화에서 언급된 이름을 쓰세요. 이름이 불명확하면 "미지정"으로 두세요. 협업 대상 목록에는 이름 옆에 부서가 괄호로 표시되어 있습니다. 사용자가 성을 뺀 이름으로 사람을 언급하면 표기 형태에 따라 확신 정도가 다릅니다:
+6. type이 "person"인 경우 tag는 위 협업 대상 목록에서 고르거나, 목록에 없으면 대화에서 언급된 이름을 쓰세요. 이름이 불명확하면 "미지정"으로 두세요. 협업 대상 목록에는 이름 옆에 괄호로 부서와 직책이 표시되어 있습니다(예: "구성원1 (DX팀 / 팀장)").
+6-0. **직책 호칭으로 사람을 가리키는 경우**: 사용자가 "팀장님", "부문장님", "임원분" 처럼 직책으로 사람을 지칭하면, 협업 대상 목록에서 그 직책을 가진 사람을 찾아 그 사람으로 처리하세요. 예를 들어 "구성원1 (DX팀 / 팀장)"이 등록되어 있고 사용자가 "팀장님과 면담했다"고 하면 tag는 구성원1입니다. 되묻지 말고 바로 진행하세요.
+- 같은 직책을 가진 사람이 2명 이상이면 임의로 고르지 말고, 그 후보들을 제시해 되물으세요. 예: "팀장님이라고 하셨는데 구성원1님일까요, 구성원3님일까요?"
+- 그 직책을 가진 사람이 목록에 아무도 없으면 tag를 "미지정"으로 두지 말고, reply에서 누구인지 물어보세요. 예: "팀장님이 누구신지 알려주시면 그분 기록으로 정리할게요."
+- 직책이 사람을 가리키는 게 아니라 제도·기준·일반론을 말하는 맥락이면(예: "팀장 승진 기준이 바뀌었다", "팀장급 대상 교육") 사람 기록으로 만들지 마세요. 문맥상 특정인의 행동·발언·협업을 말할 때만 그 사람으로 연결하세요. 사용자가 성을 뺀 이름으로 사람을 언급하면 표기 형태에 따라 확신 정도가 다릅니다:
 - "구성원N님"/"구성원N씨"처럼 정중한 호칭이 붙은 경우: 확실한 매칭이니 되묻지 말고 바로 그 사람으로 진행하세요.
 - "구성원N아"/"구성원N야"/"구성원N이"처럼 캐주얼한 호칭·조사가 붙은 경우: 먼저 [이번 대화에서 이미 확인된 사람] 목록에 그 사람이 있는지 확인하세요. 있으면 되묻지 말고 바로 진행하세요. 없으면, 다른 단어(지명 등)와 우연히 겹쳤을 수 있으니 문맥상 사람 얘기가 명백하지 않다면 entries를 만들기 전에 반드시 부서명과 함께 자연스럽게 되물어 확인하세요 (예: "혹시 DX팀의 구성원1님 얘기하시는 거예요?"). 문맥상 확실히 사람 얘기면(예: "~랑 회의했어" 처럼 사람에게만 쓰는 표현이 같이 있으면) 되묻지 않아도 됩니다.
 7. entries를 만들 때, 그 내용이 [진행중(미완료) 업무 목록]에 있는 항목 중 하나를 실제로 이어서 진행했거나 마무리한 것처럼 보이면, 그 항목의 id를 completesEntryId에 넣으세요 (id는 목록의 [id:xxxx] 부분입니다). 확신이 없으면 completesEntryId는 빈 문자열로 두세요. 이 경우 reply에서 자연스럽게 확인하세요 (예: "지난번 말씀하신 OO 관련 후속 작업이네요, 그 항목 완료로 표시할까요?").
@@ -2507,7 +2533,7 @@ ${notesText || '(기록 없음)'}
         const cs = parsed.companySettings || null;
         state.importPendingData = {
           people: parsed.people || [], goals: parsed.goals || [],
-          departments: parsed.departments || [], personDept: parsed.personDept || {},
+          departments: parsed.departments || [], personDept: parsed.personDept || {}, personRole: parsed.personRole || {},
           entries: parsed.entries || [], goalDetails: parsed.goalDetails || {},
           companySettings: cs
         };
@@ -2541,6 +2567,7 @@ ${notesText || '(기록 없음)'}
     ensureOtherGoalLast();
     d.departments.forEach(dep => { if (!state.departments.includes(dep)) state.departments.push(dep); });
     Object.assign(state.personDept, d.personDept);
+    Object.assign(state.personRole, d.personRole || {});
     Object.assign(state.goalDetails, d.goalDetails);
     const existingIds = new Set(state.entries.map(e => e.id));
     let addedCount = 0;
@@ -2956,6 +2983,7 @@ ${notesText || '(기록 없음)'}
         state.people.map(p => {
           const cnt = state.entries.filter(e => e.type==='person' && e.tag===p).length;
           const dep = state.personDept[p] || '';
+          const role = state.personRole[p] || '';
           if (state.editingPerson === p) {
             return `<div class="wj-manage-row">
               <input class="wj-input" id="wj-edit-person-input" value="${esc(state.editingPersonValue)}" style="max-width:220px" />
@@ -2966,8 +2994,9 @@ ${notesText || '(기록 없음)'}
             </div>`;
           }
           return `<div class="wj-manage-row">
-            <span>${esc(p)} ${dep ? `<span class="wj-count-badge">${esc(dep)}</span>` : ''} <span class="wj-count-badge">${cnt}건</span></span>
+            <span>${esc(p)} ${dep ? `<span class="wj-count-badge">${esc(dep)}</span>` : ''}${role ? ` <span class="wj-count-badge" style="background:#ecfdf5; color:#065f46">${esc(role)}</span>` : ''} <span class="wj-count-badge">${cnt}건</span></span>
             <div style="display:flex; align-items:center; gap:8px">
+              <input class="wj-input" style="width:110px; padding:5px 8px; font-size:12.5px" placeholder="직책" value="${esc(role)}" data-set-role="${esc(p)}" />
               <select class="wj-select" style="width:auto; padding:5px 8px; font-size:12.5px" data-set-dept="${esc(p)}">
                 <option value="">부서 미지정</option>
                 ${state.departments.map(dpt => `<option value="${esc(dpt)}" ${dep===dpt?'selected':''}>${esc(dpt)}</option>`).join('')}
@@ -3037,6 +3066,7 @@ ${notesText || '(기록 없음)'}
         if (newName !== oldName && state.people.includes(newName)) { showToast('이미 존재하는 구성원입니다.'); return; }
         state.people = state.people.map(p => p === oldName ? newName : p);
         if (state.personDept[oldName]) { state.personDept[newName] = state.personDept[oldName]; delete state.personDept[oldName]; }
+        if (state.personRole[oldName]) { state.personRole[newName] = state.personRole[oldName]; delete state.personRole[oldName]; }
         state.entries.forEach(e => { if (e.type === 'person' && e.tag === oldName) e.tag = newName; });
         if (state.viewPersonSel === oldName) state.viewPersonSel = newName;
         state.editingPerson = null;
@@ -3065,6 +3095,21 @@ ${notesText || '(기록 없음)'}
         saveData(); render();
       });
     });
+    document.querySelectorAll('[data-set-role]').forEach(input => {
+      // 입력 중에는 화면을 다시 그리지 않는다 (포커스가 튀어서 타이핑이 끊긴다).
+      const commitRole = () => {
+        const person = input.dataset.setRole;
+        const val = (input.value || '').trim();
+        const prev = state.personRole[person] || '';
+        if (val === prev) return;
+        if (val) state.personRole[person] = val;
+        else delete state.personRole[person];
+        saveData();
+        showToast(val ? `${person} 직책을 "${val}"로 저장했습니다.` : `${person} 직책을 지웠습니다.`);
+      };
+      input.addEventListener('blur', commitRole);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { commitRole(); input.blur(); } });
+    });
     document.getElementById('wj-add-person').addEventListener('click', () => {
       const val = document.getElementById('wj-new-person').value.trim();
       if (!val) return;
@@ -3077,6 +3122,7 @@ ${notesText || '(기록 없음)'}
       btn.addEventListener('click', () => {
         state.people = state.people.filter(p => p !== btn.dataset.delPerson);
         delete state.personDept[btn.dataset.delPerson];
+        delete state.personRole[btn.dataset.delPerson];
         saveData(); render();
       });
     });
