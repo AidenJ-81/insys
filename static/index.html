@@ -571,7 +571,7 @@
     aiGoalSummaryLoading: false, aiGoalSummaryText: '', aiGoalSummaryError: '', aiGoalSummaryForGoal: '',
     aiQuarterSummaryLoading: false, aiQuarterSummaryText: '', aiQuarterSummaryError: '', aiQuarterSummaryForKey: '',
     aiQuarterSupportText: '',
-    chatMessages: [], chatInput: '', chatLoading: false, chatPending: [], chatError: '',
+    chatMessages: [], chatInput: '', chatLoading: false, chatPending: [], chatPendingSeq: 0, chatError: '',
     chatPersona: 'default', companyProfile: '', companyProfileDraft: '',
     profileFileLoading: false, profileFileError: '',
     chatDateStart: getWeekMonday(todayStr()), chatDateEnd: getWeekSunday(todayStr()),
@@ -1563,6 +1563,9 @@
       const openItemsContext = openItems.length > 0
         ? openItems.map(e => `- [id:${e.id}] (목표: ${e.tag}, ${fmtEntryDate(e)}) ${anonymizeText(e.content, forward)}`).join('\n')
         : '(진행중인 업무 없음)';
+      const pendingContext = state.chatPending.length > 0
+        ? state.chatPending.map(p => `- [pid:${p.pid}] (${p.type === 'person' ? '협업' : '업무'} / ${anonymizeText(p.tag, forward) || '미지정'}) ${anonymizeText(p.content, forward)}`).join('\n')
+        : '(없음)';
       const recentChat = state.chatMessages.slice(-10).map(m => `${m.role === 'user' ? '사용자' : 'AI'}: ${anonymizeText(m.text, forward)}`).join('\n');
 
       const prompt = `당신은 회사 업무 기록을 정리해주는 도우미입니다. 사용자와 대화하면서, 나중에 MBO 성과평가·S-Talk·리더십 진단에 쓸 수 있는 기록으로 자연스럽게 다듬어주세요.
@@ -1577,6 +1580,9 @@ ${peopleContext}
 ${confirmedCasualContext ? `\n[이번 대화에서 이미 확인된 사람] ${confirmedCasualContext} — 이 사람들은 캐주얼한 호칭(아/야/이 등)으로 다시 언급되어도 이미 확인이 끝난 상태이니 더 이상 부서를 되묻지 말고 바로 그 사람으로 처리하세요.\n` : ''}
 [진행중(미완료) 업무 목록]
 ${openItemsContext}
+
+[지금 화면에 제안된 상태로 떠 있는 기록 - 아직 저장 안 됨]
+${pendingContext}
 
 [최근 대화]
 ${recentChat}
@@ -1623,7 +1629,9 @@ reply 필드:
 - 되묻는 경우: 자연스러운 질문 문장만 담으세요 (1~2문장). entries는 빈 배열로 두세요.
 - 진행 상황을 물어본 경우: 위 지침대로 답변하세요. entries는 빈 배열로 두세요.
 - 기록을 만드는 경우: "기록해뒀습니다" 식의 사무적인 확인 멘트로 끝내지 마세요. 대신 실제 동료가 궁금해서 되묻듯이, 이 내용에서 아직 안 나온 흥미로운 부분을 하나 자연스럽게 물어보세요 — 예를 들어 누구와 함께했는지, 반응이 어땠는지, 어떤 계기였는지, 다음엔 뭘 할 계획인지 등. 이미 그 정보가 메시지에 다 담겨 있다면 억지로 묻지 말고 짧게 공감·리액션만 하세요. 이 질문은 정보를 캐내려는 게 아니라 대화가 자연스럽게 이어지도록 하는 것이 목적입니다 — 딱딱한 체크리스트처럼 느껴지면 안 됩니다. completesEntryId를 채웠다면 그 확인 질문도 포함하세요.
-- 사용자가 방금 만들어진 기록에 대해 위 질문에 답하며 새로운 내용(협업 대상, 배경, 결과 등)을 추가로 알려주면, 새 항목을 또 만들지 말고 [최근 대화]에서 방금 그 기록의 내용을 찾아 그 내용을 보강한 새로운 content로 다시 만드세요 (마치 기존 기록을 수정하듯). 이때도 다른 대상/목표로 완전히 갈라지는 별개의 얘기라면 새 항목으로 분리하세요.
+- 사용자가 방금 만들어진 기록에 대해 위 질문에 답하며 새로운 내용(협업 대상, 배경, 결과 등)을 추가로 알려주면, **새 항목을 또 만들지 말고 [지금 화면에 제안된 상태로 떠 있는 기록]에서 해당 항목을 찾아 그 pid를 revisesPendingId에 넣고, 보강된 전체 내용을 content에 담아 하나만 내보내세요.** revisesPendingId를 채우면 그 제안이 새 내용으로 교체되고, 비워두면 목록에 하나가 더 늘어납니다. 이때도 다른 대상/목표로 완전히 갈라지는 별개의 얘기라면 revisesPendingId를 비우고 새 항목으로 분리하세요.
+- **제안 목록이 불필요하게 늘어나지 않게 하세요.** entries를 만들기 전에 항상 [지금 화면에 제안된 상태로 떠 있는 기록]을 먼저 확인하고, 내보내려는 내용이 그중 하나와 같은 일에 대한 것이면 반드시 revisesPendingId를 채워 교체하세요. 같은 목표·같은 대상에 대해 비슷한 내용이 두 건 이상 제안 목록에 쌓이는 것은 잘못된 동작입니다.
+- 한 턴에 새로 추가하는 항목은 최대 2개까지입니다. 사용자가 한 메시지에 여러 일을 몰아서 적었더라도, 서로 다른 목표·대상으로 명확히 갈라지는 것만 나누고 나머지는 하나로 합치세요. 3개 이상 필요해 보이면 우선 2개만 정리하고 reply에서 "나머지는 따로 적어주시면 이어서 정리할게요"처럼 안내하세요.
 - 절대 "저장했습니다", "기록했습니다"처럼 이미 확정 저장된 것처럼 말하지 마세요. 실제로는 사용자가 아래 후보 목록에서 "저장" 버튼을 눌러야 최종 저장됩니다. "이렇게 정리해봤어요", "확인해서 저장해주세요"처럼 아직 확인이 필요하다는 뉘앙스로 표현하세요.
 - 중복 기록 방지: [최근 대화]에서 바로 이전 AI 턴이 이미 기록을 제안했는데, 이번 사용자 메시지가 "그래", "응", "네", "좋아", "ㅇㅇ", "ok", "넵" 같은 단순 동의/확인 표현뿐이고 새로운 정보가 없다면, 그건 방금 제안한 걸 저장해달라는 뜻이지 또 다른 기록을 만들라는 게 아닙니다. 이 경우 entries는 반드시 빈 배열로 두고, reply에는 "네! 아래 목록에서 저장 버튼 눌러주시면 반영돼요" 처럼 안내만 짧게 하세요.
 - reply의 말투: ${PERSONA_PROMPTS[state.chatPersona] || PERSONA_PROMPTS.default}
@@ -1639,7 +1647,8 @@ reply 필드:
       "content": "기록 내용 (한두 문장으로 정리)",
       "status": "진행중 또는 완료 또는 취소 (work일 때만)",
       "relatedGoals": [ { "goal": "목표명", "reason": "근거", "confidence": "high" } ],
-      "completesEntryId": "완료로 이어지는 기존 항목의 id (없으면 빈 문자열)"
+      "completesEntryId": "완료로 이어지는 기존 항목의 id (없으면 빈 문자열)",
+      "revisesPendingId": "이미 제안된 기록을 보강/수정하는 경우 그 pid (새 항목이면 빈 문자열)"
     }
   ]
 }`;
@@ -1657,10 +1666,14 @@ reply 필드:
 
       state.chatMessages.push({ role: 'assistant', text: deanonymizeText(parsed.reply, reverse) || '기록을 분석했어요. 아래 제안을 확인해주세요.' });
 
+      let pendingSeq = state.chatPendingSeq || 0;
       const newPending = (parsed.entries || []).map(e => {
         const completesId = e.completesEntryId && state.entries.some(x => x.id === e.completesEntryId && x.status === '진행중')
           ? e.completesEntryId : '';
+        pendingSeq += 1;
         return {
+          pid: 'p' + pendingSeq,
+          revisesPendingId: (e.revisesPendingId || '').trim(),
           type: e.type === 'person' ? 'person' : 'work',
           tag: deanonymizeText(e.tag, reverse) || '',
           content: deanonymizeText(e.content, reverse) || '',
@@ -1675,7 +1688,29 @@ reply 필드:
           completesApproved: !!completesId
         };
       });
-      state.chatPending = state.chatPending.concat(newPending);
+      state.chatPendingSeq = pendingSeq;
+
+      // AI가 기존 제안의 수정본을 내놓은 경우에는 덧붙이지 않고 그 자리를 대체한다.
+      // 예전에는 무조건 concat 해서, 대화로 내용을 보강할수록 원본과 수정본이 함께
+      // 쌓이며 제안 목록이 계속 불어났다.
+      newPending.forEach(np => {
+        const targetId = np.revisesPendingId;
+        delete np.revisesPendingId;
+        let at = -1;
+        if (targetId) at = state.chatPending.findIndex(x => x.pid === targetId);
+        // id를 안 준 경우에도, 같은 종류·같은 대상의 제안이 이미 있으면 수정본으로 본다.
+        if (at === -1) {
+          at = state.chatPending.findIndex(x => x.type === np.type && x.tag && x.tag === np.tag);
+        }
+        if (at >= 0) {
+          // 사용자가 이미 손본 날짜는 그대로 살린다.
+          np.dateStart = state.chatPending[at].dateStart;
+          np.dateEnd = state.chatPending[at].dateEnd;
+          state.chatPending[at] = np;
+        } else {
+          state.chatPending.push(np);
+        }
+      });
 
       // 이번 턴에서 사람으로 확정된 항목이 있으면, 캐주얼 호칭이어도 다음부터 안 물어보도록 기억해둔다.
       newPending.forEach(p => {
