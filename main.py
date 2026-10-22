@@ -33,6 +33,11 @@ AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
 AI_BASE_URL = os.environ.get("AI_BASE_URL", "")  # custom 제공자(예: 웍스AI) 사용 시 엔드포인트 지정
 AI_AGENT_ID = os.environ.get("AI_AGENT_ID", "")  # 웍스AI 전용 - 사용할 에이전트 ID
 
+# AI 응답 대기 시간(초).
+# 리더십 진단처럼 기록 수십 건을 10개 항목에 대조하는 작업은 60초를 쉽게 넘긴다.
+# 기록이 쌓일수록 길어지므로 넉넉하게 잡는다. 필요하면 환경변수로 조정.
+AI_TIMEOUT_SECONDS = float(os.environ.get("AI_TIMEOUT_SECONDS", "180"))
+
 # 자동 백업 설정
 # BACKUP_DIR 을 따로 주지 않으면 DB 파일과 같은 폴더 아래 backups/ 를 쓴다.
 # DB_PATH가 /data/app.db 이므로 기본값은 /data/backups/ 가 되고, 이는 Coolify 볼륨 안이라
@@ -898,15 +903,26 @@ def put_company_settings(body: CompanySettingsBody, request: Request):
 # (API 키가 브라우저에 노출되지 않고, 고정 서버 IP로 호출되므로 IP 허용목록 기반
 #  사내 API에도 대응 가능)
 # ---------------------------------------------------------------------------
-def _post_json(url: str, body: dict, headers: dict) -> dict:
+def _post_json(url: str, body: dict, headers: dict, timeout: Optional[float] = None) -> dict:
     req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=timeout or AI_TIMEOUT_SECONDS) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", errors="ignore")
         raise HTTPException(status_code=502, detail=f"AI 제공자 오류({e.code}): {detail[:300]}")
+    except TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail=f"AI 응답이 {int(timeout or AI_TIMEOUT_SECONDS)}초 안에 오지 않았습니다. 기록이 많으면 오래 걸릴 수 있어요. 잠시 후 다시 시도해주세요.",
+        )
     except Exception as e:
+        # urllib은 소켓 타임아웃을 socket.timeout(=OSError)으로 올리기도 한다.
+        if "timed out" in str(e).lower():
+            raise HTTPException(
+                status_code=504,
+                detail=f"AI 응답이 {int(timeout or AI_TIMEOUT_SECONDS)}초 안에 오지 않았습니다. 기록이 많으면 오래 걸릴 수 있어요. 잠시 후 다시 시도해주세요.",
+            )
         raise HTTPException(status_code=502, detail=f"AI 요청 실패: {e}")
 
 
